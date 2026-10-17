@@ -33,16 +33,16 @@ public class EmailService {
                 Votre compte SPAT-CLM a été créé avec succès.
 
                 Votre matricule de connexion : %s
+                Votre mot de passe provisoire : %s
 
-                Un mot de passe provisoire a été défini pour votre compte.
-
-                Pour votre sécurité, ne partagez pas vos identifiants.
+                Pour votre sécurité, changez ce mot de passe après votre
+                première connexion et ne partagez pas vos identifiants.
                 Si vous n'êtes pas à l'origine de cette création,
                 veuillez contacter l'administrateur.
 
                 Cordialement,
                 Administration SPAT-CLM
-                """.formatted(nomComplet, login);
+                """.formatted(nomComplet, login, motDePasseProvisoire);
 
         envoyer(destinataire, sujet, contenu);
     }
@@ -60,15 +60,16 @@ public class EmailService {
                 Le mot de passe de votre compte SPAT-CLM a été modifié
                 par l'administrateur.
 
-                Connectez-vous avec votre matricule et le nouveau
-                mot de passe qui vous a été communiqué séparément.
+                Votre nouveau mot de passe : %s
+
+                Connectez-vous avec votre matricule et ce nouveau mot de passe.
 
                 Si vous n'êtes pas à l'origine de cette modification,
                 veuillez contacter immédiatement l'administrateur.
 
                 Cordialement,
                 Administration SPAT-CLM
-                """.formatted(nomComplet);
+                """.formatted(nomComplet, nouveauMotDePasse);
 
         envoyer(destinataire, sujet, contenu);
     }
