@@ -1,6 +1,7 @@
 package com.suivicontrats.front.entity;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
@@ -31,6 +32,7 @@ public class Utilisateurs {
     @Column(name = "utilisateurs_email", nullable = false, unique = true, length = 150)
     private String email;
 
+    @JsonIgnore
     @Column(name = "utilisateurs_mot_de_passe", nullable = false)
     private String motDePasse;
 
@@ -49,6 +51,7 @@ public class Utilisateurs {
     @Column(name = "utilisateurs_date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
 
+    @JsonIgnore
     @Column(name = "utilisateurs_secret_2fa", length = 255)
     private String secret2fa;
 

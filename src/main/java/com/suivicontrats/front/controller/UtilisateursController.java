@@ -2,6 +2,9 @@
 package com.suivicontrats.front.controller;
 
 import com.suivicontrats.front.entity.Utilisateurs;
+import com.suivicontrats.front.dto.ProfilRequest;
+import com.suivicontrats.front.dto.UtilisateursDTO;
+import jakarta.validation.Valid;
 import com.suivicontrats.front.service.UtilisateursService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +34,13 @@ public class UtilisateursController {
             @RequestBody Utilisateurs utilisateur) {
 
         return ResponseEntity.ok(service.create(utilisateur));
+    }
+
+    @PutMapping("/{id}/profil")
+    public ResponseEntity<UtilisateursDTO> updateProfile(
+            @PathVariable Integer id,
+            @Valid @RequestBody ProfilRequest request) {
+        return ResponseEntity.ok(service.updateProfile(id, request));
     }
 
     @PutMapping("/{id}")

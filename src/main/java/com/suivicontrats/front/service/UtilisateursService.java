@@ -2,6 +2,8 @@
 package com.suivicontrats.front.service;
 
 import com.suivicontrats.front.entity.Utilisateurs;
+import com.suivicontrats.front.dto.ProfilRequest;
+import com.suivicontrats.front.dto.UtilisateursDTO;
 import com.suivicontrats.front.repository.UtilisateursRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -70,6 +72,31 @@ public class UtilisateursService {
         }
 
         return savedUser;
+    }
+
+    @Transactional
+    public UtilisateursDTO updateProfile(Integer id, ProfilRequest details) {
+        Utilisateurs utilisateur = getOne(id);
+        String email = details.getEmail().trim();
+        if (repository.findByEmailIgnoreCase(email)
+                .filter(existing -> !existing.getId().equals(id)).isPresent()) {
+            throw new IllegalArgumentException("Cette adresse e-mail est déjà utilisée.");
+        }
+        utilisateur.setNom(details.getNom().trim());
+        utilisateur.setPrenom(details.getPrenom().trim());
+        utilisateur.setEmail(email);
+        utilisateur.setService(details.getService() == null ? null : details.getService().trim());
+        Utilisateurs saved = repository.save(utilisateur);
+        return UtilisateursDTO.builder()
+                .id(saved.getId())
+                .matricule(saved.getMatricule())
+                .nom(saved.getNom())
+                .prenom(saved.getPrenom())
+                .email(saved.getEmail())
+                .role(saved.getRole() == null ? null : saved.getRole().name())
+                .service(saved.getService())
+                .actif(saved.getActif())
+                .build();
     }
 
     @Transactional
