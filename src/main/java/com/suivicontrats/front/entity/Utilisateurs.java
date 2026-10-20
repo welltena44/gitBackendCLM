@@ -2,6 +2,7 @@ package com.suivicontrats.front.entity;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
@@ -32,7 +33,7 @@ public class Utilisateurs {
     @Column(name = "utilisateurs_email", nullable = false, unique = true, length = 150)
     private String email;
 
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "utilisateurs_mot_de_passe", nullable = false)
     private String motDePasse;
 
@@ -58,6 +59,10 @@ public class Utilisateurs {
     @Column(name = "utilisateurs_enabled_2fa", nullable = false)
     @Builder.Default
     private Boolean enabled2fa = false;
+
+    @Column(name = "utilisateurs_changement_mot_de_passe_requis", nullable = false)
+    @Builder.Default
+    private Boolean changementMotDePasseRequis = false;
 
     public enum Role {
         ADMIN,

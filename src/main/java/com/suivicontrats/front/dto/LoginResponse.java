@@ -13,5 +13,6 @@ public class LoginResponse {
     private String role;
     private String service;
     private Boolean actif; 
+    private Boolean changementMotDePasseRequis;
     private String message;
 }

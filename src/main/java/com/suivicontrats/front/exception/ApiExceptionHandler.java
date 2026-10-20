@@ -2,6 +2,7 @@ package com.suivicontrats.front.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +23,14 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException ex) {
         return response(HttpStatus.BAD_REQUEST, safeMessage(ex.getMessage(), "Requête invalide."));
+    }
+
+    @ExceptionHandler(MailException.class)
+    public ResponseEntity<Map<String, Object>> mail(MailException ex) {
+        return response(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                safeMessage(ex.getMessage(), "Le courriel de notification n'a pas pu être envoyé.")
+        );
     }
 
     @ExceptionHandler(RuntimeException.class)

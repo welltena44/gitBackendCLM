@@ -7,10 +7,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
+import com.suivicontrats.front.service.UtilisateursService;
 
 @RestController @RequestMapping("/api/auth") @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final UtilisateursService utilisateursService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest body){
@@ -21,5 +23,16 @@ public class AuthController {
     @PostMapping("/demande-acces")
     public Map<String,String> demande(@RequestBody Map<String,String> b){
         return Map.of("message","Demande reçue pour "+b.get("email"));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body) {
+        try {
+            utilisateursService.changerMotDePasse(
+                Integer.valueOf(body.get("userId")), body.get("motDePasseActuel"), body.get("nouveauMotDePasse"));
+            return ResponseEntity.ok(Map.of("message", "Mot de passe modifié."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 }

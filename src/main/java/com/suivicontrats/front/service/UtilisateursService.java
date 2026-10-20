@@ -6,17 +6,18 @@ import com.suivicontrats.front.dto.ProfilRequest;
 import com.suivicontrats.front.dto.UtilisateursDTO;
 import com.suivicontrats.front.repository.UtilisateursRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.security.SecureRandom;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UtilisateursService {
+    private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UtilisateursRepository repository;
     private final PasswordEncoder passwordEncoder;
@@ -38,38 +39,24 @@ public class UtilisateursService {
     public Utilisateurs create(Utilisateurs utilisateur) {
         utilisateur.setId(null);
 
-        if (utilisateur.getMotDePasse() == null
-                || utilisateur.getMotDePasse().isBlank()) {
-            throw new IllegalArgumentException(
-                    "Le mot de passe est obligatoire à la création");
-        }
-
         if (utilisateur.getMatricule() == null) {
             throw new IllegalArgumentException(
                     "Le matricule est obligatoire");
         }
 
-        String motDePasseClair = utilisateur.getMotDePasse();
-
+        String motDePasseClair = genererMotDePasse();
         utilisateur.setMotDePasse(
                 passwordEncoder.encode(motDePasseClair));
+        utilisateur.setChangementMotDePasseRequis(true);
 
         Utilisateurs savedUser = repository.save(utilisateur);
 
-        try {
-            emailService.envoyerEmailCreationCompte(
-                    savedUser.getEmail(),
-                    nomComplet(savedUser),
-                    String.valueOf(savedUser.getMatricule()),
-                    motDePasseClair
-            );
-        } catch (RuntimeException e) {
-            log.error(
-                    "Compte créé, mais échec de l'envoi de l'e-mail à {}",
-                    savedUser.getEmail(),
-                    e
-            );
-        }
+        emailService.envoyerEmailCreationCompte(
+            savedUser.getEmail(),
+            nomComplet(savedUser),
+            String.valueOf(savedUser.getMatricule()),
+            motDePasseClair
+        );
 
         return savedUser;
     }
@@ -77,6 +64,7 @@ public class UtilisateursService {
     @Transactional
     public UtilisateursDTO updateProfile(Integer id, ProfilRequest details) {
         Utilisateurs utilisateur = getOne(id);
+        String ancienneAdresse = utilisateur.getEmail();
         String email = details.getEmail().trim();
         if (repository.findByEmailIgnoreCase(email)
                 .filter(existing -> !existing.getId().equals(id)).isPresent()) {
@@ -87,6 +75,20 @@ public class UtilisateursService {
         utilisateur.setEmail(email);
         utilisateur.setService(details.getService() == null ? null : details.getService().trim());
         Utilisateurs saved = repository.save(utilisateur);
+
+        if (!email.equalsIgnoreCase(ancienneAdresse)) {
+            emailService.envoyerEmailModificationAdresse(
+                ancienneAdresse,
+                email,
+                nomComplet(saved)
+            );
+        } else {
+            emailService.envoyerEmailModificationCompte(
+                email,
+                nomComplet(saved)
+            );
+        }
+
         return UtilisateursDTO.builder()
                 .id(saved.getId())
                 .matricule(saved.getMatricule())
@@ -152,8 +154,9 @@ public class UtilisateursService {
                         || !passwordEncoder.matches(
                                 nouveauMotDePasse, ancienHash);
 
-                utilisateur.setMotDePasse(
-                        passwordEncoder.encode(nouveauMotDePasse));
+                nouveauMotDePasse = genererMotDePasse();
+                utilisateur.setMotDePasse(passwordEncoder.encode(nouveauMotDePasse));
+                utilisateur.setChangementMotDePasseRequis(true);
             }
         }
 
@@ -163,38 +166,60 @@ public class UtilisateursService {
                 && !details.getEmail().equalsIgnoreCase(ancienneAdresse);
 
         if (adresseModifiee) {
-            try {
-                emailService.envoyerEmailModificationAdresse(
-                        ancienneAdresse,
-                        savedUser.getEmail(),
-                        nomComplet(savedUser)
-                );
-            } catch (RuntimeException e) {
-                log.error(
-                        "Adresse modifiée, mais échec de notification pour {}",
-                        savedUser.getEmail(),
-                        e
-                );
-            }
+            emailService.envoyerEmailModificationAdresse(
+                    ancienneAdresse,
+                    savedUser.getEmail(),
+                    nomComplet(savedUser)
+            );
         }
 
         if (motDePasseModifie) {
-            try {
-                emailService.envoyerEmailModificationMotDePasse(
-                        savedUser.getEmail(),
-                        nomComplet(savedUser),
-                        nouveauMotDePasse
-                );
-            } catch (RuntimeException e) {
-                log.error(
-                        "Mot de passe modifié, mais échec de notification pour {}",
-                        savedUser.getEmail(),
-                        e
-                );
-            }
+            emailService.envoyerEmailModificationMotDePasse(
+                    savedUser.getEmail(),
+                    nomComplet(savedUser),
+                    nouveauMotDePasse
+            );
+        }
+
+        if (!adresseModifiee && !motDePasseModifie) {
+            emailService.envoyerEmailModificationCompte(
+                    savedUser.getEmail(),
+                    nomComplet(savedUser)
+            );
         }
 
         return savedUser;
+    }
+
+    @Transactional
+    public void changerMotDePasse(Integer id, String motDePasseActuel, String nouveauMotDePasse) {
+        Utilisateurs utilisateur = getOne(id);
+        if (motDePasseActuel == null || !passwordEncoder.matches(motDePasseActuel, utilisateur.getMotDePasse())) {
+            throw new IllegalArgumentException("Le mot de passe actuel est incorrect.");
+        }
+        if (nouveauMotDePasse == null || nouveauMotDePasse.length() < 8 || nouveauMotDePasse.length() > 128) {
+            throw new IllegalArgumentException("Le nouveau mot de passe doit contenir entre 8 et 128 caractères.");
+        }
+        utilisateur.setMotDePasse(passwordEncoder.encode(nouveauMotDePasse));
+        utilisateur.setChangementMotDePasseRequis(false);
+        repository.save(utilisateur);
+    }
+
+    private String genererMotDePasse() {
+        StringBuilder value = new StringBuilder(8);
+        for (int i = 0; i < 8; i++) value.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
+        return value.toString();
+    }
+
+    @Transactional
+    public void reinitialiserMotDePasse(Integer id) {
+        Utilisateurs utilisateur = getOne(id);
+        String motDePasseProvisoire = genererMotDePasse();
+        utilisateur.setMotDePasse(passwordEncoder.encode(motDePasseProvisoire));
+        utilisateur.setChangementMotDePasseRequis(true);
+        repository.save(utilisateur);
+        emailService.envoyerEmailModificationMotDePasse(
+                utilisateur.getEmail(), nomComplet(utilisateur), motDePasseProvisoire);
     }
 
     @Transactional
@@ -210,18 +235,10 @@ public class UtilisateursService {
     public void delete(Integer id) {
         Utilisateurs utilisateur = getOne(id);
 
-        try {
-            emailService.envoyerEmailSuppressionCompte(
-                    utilisateur.getEmail(),
-                    nomComplet(utilisateur)
-            );
-        } catch (RuntimeException e) {
-            log.error(
-                    "Utilisateur {} supprimé, mais échec de notification e-mail",
-                    id,
-                    e
-            );
-        }
+        emailService.envoyerEmailSuppressionCompte(
+            utilisateur.getEmail(),
+            nomComplet(utilisateur)
+        );
 
         repository.delete(utilisateur);
     }

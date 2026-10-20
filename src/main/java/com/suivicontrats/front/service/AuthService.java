@@ -55,6 +55,7 @@ public class AuthService {
             .role(u.getRole().name())
             .service(u.getService())
             .actif(u.getActif())
+            .changementMotDePasseRequis(u.getChangementMotDePasseRequis())
             .message("Connexion réussie")
             .build();
     }

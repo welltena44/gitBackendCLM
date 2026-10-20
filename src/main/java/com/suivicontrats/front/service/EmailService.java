@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
+import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,9 @@ public class EmailService {
 
     @Value("${spring.mail.username}")
     private String adresseExpediteur;
+
+    @Value("${spring.mail.password}")
+    private String motDePasseExpediteur;
 
     public void envoyerEmailCreationCompte(
             String destinataire,
@@ -35,8 +39,8 @@ public class EmailService {
                 Votre matricule de connexion : %s
                 Votre mot de passe provisoire : %s
 
-                Pour votre sécurité, changez ce mot de passe après votre
-                première connexion et ne partagez pas vos identifiants.
+                Vous devrez choisir un nouveau mot de passe après votre première connexion.
+                Ce mot de passe provisoire ne peut servir qu'à cette première étape.
                 Si vous n'êtes pas à l'origine de cette création,
                 veuillez contacter l'administrateur.
 
@@ -57,12 +61,12 @@ public class EmailService {
         String contenu = """
                 Bonjour %s,
 
-                Le mot de passe de votre compte SPAT-CLM a été modifié
-                par l'administrateur.
+                Un administrateur a réinitialisé le mot de passe de votre compte SPAT-CLM.
 
                 Votre nouveau mot de passe : %s
 
-                Connectez-vous avec votre matricule et ce nouveau mot de passe.
+                Connectez-vous avec votre matricule et ce mot de passe provisoire, puis choisissez
+                un nouveau mot de passe avant d'accéder à votre espace.
 
                 Si vous n'êtes pas à l'origine de cette modification,
                 veuillez contacter immédiatement l'administrateur.
@@ -98,6 +102,27 @@ public class EmailService {
         }
     }
 
+    public void envoyerEmailModificationCompte(
+            String destinataire,
+            String nomComplet) {
+
+        String sujet = "SPAT-CLM | Modification de votre compte";
+        String contenu = """
+                Bonjour %s,
+
+                Les informations de votre compte SPAT-CLM ont été modifiées
+                par un administrateur.
+
+                Si vous n'êtes pas à l'origine de cette modification,
+                veuillez contacter l'administration SPAT-CLM.
+
+                Cordialement,
+                Administration SPAT-CLM
+                """.formatted(nomComplet);
+
+        envoyer(destinataire, sujet, contenu);
+    }
+
     public void envoyerEmailSuppressionCompte(
             String destinataire,
             String nomComplet) {
@@ -129,13 +154,14 @@ public class EmailService {
             String contenu) {
 
         if (destinataire == null || destinataire.isBlank()) {
-            throw new IllegalArgumentException(
-                    "L'adresse e-mail du destinataire est obligatoire.");
+            log.warn("E-mail {} ignoré : adresse du destinataire absente", sujet);
+            return;
         }
 
-        if (adresseExpediteur == null || adresseExpediteur.isBlank()) {
-            throw new IllegalStateException(
-                    "La configuration spring.mail.username est absente.");
+        if (adresseExpediteur == null || adresseExpediteur.isBlank()
+                || motDePasseExpediteur == null || motDePasseExpediteur.isBlank()) {
+            throw new MailAuthenticationException(
+                    "E-mail non envoyé : configurez MAIL_USERNAME et MAIL_PASSWORD dans l'environnement du backend.");
         }
 
         SimpleMailMessage message = new SimpleMailMessage();
@@ -148,11 +174,7 @@ public class EmailService {
             mailSender.send(message);
             log.info("E-mail envoyé à {}", destinataire);
         } catch (MailException e) {
-            log.error(
-                    "Échec de l'envoi de l'e-mail à {}",
-                    destinataire,
-                    e
-            );
+            log.error("Échec SMTP pour l'e-mail destiné à {} : {}", destinataire, e.getMessage());
             throw e;
         }
     }

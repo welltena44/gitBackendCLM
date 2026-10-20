@@ -4,7 +4,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-DROP TABLE IF EXISTS journaux_audit, notifications, versions_contrat, avenants,
+DROP TABLE IF EXISTS demandes_reinitialisation_mot_de_passe, journaux_audit, notifications, versions_contrat, avenants,
     validations, regles_validation, documents_contrat, parties_contrat,
     contrats, types_contrat, parametres_alertes, utilisateurs CASCADE;
 
@@ -24,8 +24,23 @@ CREATE TABLE utilisateurs (
     utilisateurs_actif          BOOLEAN      NOT NULL DEFAULT TRUE,
     utilisateurs_secret_2fa     VARCHAR(255),
     utilisateurs_enabled_2fa    BOOLEAN      NOT NULL DEFAULT FALSE,
+    utilisateurs_changement_mot_de_passe_requis BOOLEAN NOT NULL DEFAULT FALSE,
     utilisateurs_date_creation  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
+
+-- Migration idempotente pour les bases déjà créées avant l'obligation de changement.
+ALTER TABLE utilisateurs
+    ADD COLUMN IF NOT EXISTS utilisateurs_changement_mot_de_passe_requis BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS demandes_reinitialisation_mot_de_passe (
+    demande_id BIGSERIAL PRIMARY KEY,
+    utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(utilisateurs_id) ON DELETE CASCADE,
+    statut VARCHAR(20) NOT NULL DEFAULT 'EN_ATTENTE'
+        CHECK (statut IN ('EN_ATTENTE', 'APPROUVEE', 'REJETEE')),
+    date_creation TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_demandes_reinitialisation_statut_date
+    ON demandes_reinitialisation_mot_de_passe (statut, date_creation);
 
 -- ---------------------------------------------------------------------
 -- TYPES DE CONTRATS
