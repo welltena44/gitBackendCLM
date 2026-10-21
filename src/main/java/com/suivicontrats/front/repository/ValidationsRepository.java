@@ -7,5 +7,7 @@ import java.util.List;
 public interface ValidationsRepository extends JpaRepository<Validations, Long> {
     List<Validations> findByContratId(Integer contratId);
     List<Validations> findByDecision(String decision);
+    List<Validations> findByValideurId(Integer valideurId);
+    List<Validations> findByValideurIdIsNullAndRoleRequis(String roleRequis);
     java.util.Optional<Validations> findTopByContratIdOrderByCycleDesc(Integer contratId);
 }

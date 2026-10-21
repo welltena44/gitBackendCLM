@@ -6,6 +6,7 @@ import com.suivicontrats.front.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 import java.util.Map;
 import com.suivicontrats.front.service.UtilisateursService;
 
@@ -26,10 +27,14 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body, Authentication authentication) {
         try {
+            Integer authenticatedUserId = (Integer) authentication.getPrincipal();
+            if (!authenticatedUserId.toString().equals(body.get("userId"))) {
+                return ResponseEntity.status(403).body(Map.of("message", "Vous ne pouvez modifier que votre propre mot de passe."));
+            }
             utilisateursService.changerMotDePasse(
-                Integer.valueOf(body.get("userId")), body.get("motDePasseActuel"), body.get("nouveauMotDePasse"));
+                authenticatedUserId, body.get("motDePasseActuel"), body.get("nouveauMotDePasse"));
             return ResponseEntity.ok(Map.of("message", "Mot de passe modifié."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

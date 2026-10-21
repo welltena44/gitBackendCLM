@@ -8,6 +8,8 @@ import com.warrenstrange.googleauth.GoogleAuthenticatorQRGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 
 import java.util.Map;
 
@@ -21,9 +23,11 @@ public class TwoFactorController {
     private final UtilisateursRepository utilisateursRepository;
 
     @GetMapping("/generate/{matricule}")
-    public ResponseEntity<?> generate2FA(@PathVariable String matricule) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> generate2FA(@PathVariable String matricule, Authentication authentication) {
         Utilisateurs user = utilisateursRepository.findByMatricule(Integer.valueOf(matricule))
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        if (!user.getId().equals(authentication.getPrincipal())) return ResponseEntity.status(403).body(Map.of("message", "Accès interdit."));
 
         GoogleAuthenticatorKey key = gAuth.createCredentials();
         String secret = key.getKey();
@@ -42,12 +46,14 @@ public class TwoFactorController {
     }
 
     @PostMapping("/verify")
-    public ResponseEntity<?> verify2FA(@RequestBody Map<String, Object> request) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> verify2FA(@RequestBody Map<String, Object> request, Authentication authentication) {
         String matricule = (String) request.get("matricule");
         int code = Integer.parseInt(request.get("code").toString());
 
         Utilisateurs user = utilisateursRepository.findByMatricule(Integer.valueOf(matricule))
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        if (!user.getId().equals(authentication.getPrincipal())) return ResponseEntity.status(403).body(Map.of("success", false, "message", "Accès interdit."));
 
         if (user.getSecret2fa() == null) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Aucun secret 2FA généré."));

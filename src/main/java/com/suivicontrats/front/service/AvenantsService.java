@@ -2,6 +2,9 @@ package com.suivicontrats.front.service;
 
 import com.suivicontrats.front.entity.Avenants;
 import com.suivicontrats.front.repository.AvenantsRepository;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -11,13 +14,25 @@ import java.util.List;
 public class AvenantsService {
 
     private final AvenantsRepository repo;
+    private final ContratService contratService;
 
-    public List<Avenants> all(){ return repo.findAll(); }
-    public List<Avenants> byContrat(Integer contratId){ return repo.findByContratIdOrderByNumeroAsc(contratId); }
-    public Avenants getOne(Long id){ return repo.findById(id).orElseThrow(() -> new RuntimeException("Avenant non trouvé")); }
-    public Avenants save(Avenants a){ a.setId(null); return repo.save(a); }
+    public List<Avenants> all(){
+        var allowed = contratService.getAll().stream().map(c -> c.getId()).collect(java.util.stream.Collectors.toSet());
+        return repo.findAll().stream().filter(a -> allowed.contains(a.getContratId())).toList();
+    }
+    public List<Avenants> byContrat(Integer contratId){ contratService.getById(contratId); return repo.findByContratIdOrderByNumeroAsc(contratId); }
+    public Avenants getOne(Long id){ Avenants a = repo.findById(id).orElseThrow(() -> new RuntimeException("Avenant non trouvé")); contratService.getById(a.getContratId()); return a; }
+    public Avenants save(Avenants a){
+        if (!canManage()) throw new AccessDeniedException("Seul le gestionnaire du contrat peut créer un avenant.");
+        contratService.getById(a.getContratId()); a.setId(null);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        a.setCreePar((Integer) auth.getPrincipal());
+        return repo.save(a);
+    }
     public Avenants update(Long id, Avenants details){
         Avenants a = getOne(id);
+        if (!canManage()) throw new AccessDeniedException("Seul le gestionnaire du contrat peut modifier un avenant.");
+        contratService.getById(details.getContratId());
         a.setContratId(details.getContratId());
         a.setNumero(details.getNumero());
         a.setDescription(details.getDescription());
@@ -28,8 +43,12 @@ public class AvenantsService {
         a.setDateFinAvant(details.getDateFinAvant());
         a.setDateFinApres(details.getDateFinApres());
         a.setDocumentId(details.getDocumentId());
-        a.setCreePar(details.getCreePar());
         return repo.save(a);
     }
-    public void delete(Long id){ repo.deleteById(id); }
+    public void delete(Long id){ getOne(id); if (!canManage()) throw new AccessDeniedException("Seul le gestionnaire du contrat peut supprimer un avenant."); repo.deleteById(id); }
+
+    private boolean canManage(){
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_GESTIONNAIRE"));
+    }
 }

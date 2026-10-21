@@ -5,6 +5,8 @@ import com.suivicontrats.front.service.DemandesReinitialisationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import java.util.List;
 import java.util.Map;
 
@@ -27,14 +29,16 @@ public class DemandesReinitialisationController {
     }
 
     @GetMapping("/api/admin/password-reset-requests")
-    public List<DemandeReinitialisationDTO> enAttente(@RequestHeader("X-Admin-Id") Integer adminId) {
-        return service.enAttente(adminId);
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<DemandeReinitialisationDTO> enAttente(Authentication authentication) {
+        return service.enAttente((Integer) authentication.getPrincipal());
     }
 
     @PostMapping("/api/admin/password-reset-requests/{id}/approve")
-    public ResponseEntity<?> approuver(@PathVariable Long id, @RequestHeader("X-Admin-Id") Integer adminId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> approuver(@PathVariable Long id, Authentication authentication) {
         try {
-            service.approuver(id, adminId);
+            service.approuver(id, (Integer) authentication.getPrincipal());
             return ResponseEntity.ok(Map.of("message", "Mot de passe réinitialisé et envoyé par e-mail."));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
@@ -42,9 +46,10 @@ public class DemandesReinitialisationController {
     }
 
     @PostMapping("/api/admin/password-reset-requests/{id}/reject")
-    public ResponseEntity<?> rejeter(@PathVariable Long id, @RequestHeader("X-Admin-Id") Integer adminId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> rejeter(@PathVariable Long id, Authentication authentication) {
         try {
-            service.rejeter(id, adminId);
+            service.rejeter(id, (Integer) authentication.getPrincipal());
             return ResponseEntity.ok(Map.of("message", "Demande rejetée."));
         } catch (SecurityException e) {
             return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));

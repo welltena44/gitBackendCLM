@@ -5,6 +5,7 @@ import com.suivicontrats.front.dto.LoginRequest;
 import com.suivicontrats.front.dto.LoginResponse;
 import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.UtilisateursRepository;
+import com.suivicontrats.front.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,7 @@ public class AuthService {
 
     private final UtilisateursRepository repo;
     private final PasswordEncoder encoder;
-
+    private final JwtService jwtService;
     public LoginResponse login(LoginRequest req) {
 
         // Recherche par matricule
@@ -56,6 +57,7 @@ public class AuthService {
             .service(u.getService())
             .actif(u.getActif())
             .changementMotDePasseRequis(u.getChangementMotDePasseRequis())
+            .token(jwtService.issue(u.getId()))
             .message("Connexion réussie")
             .build();
     }

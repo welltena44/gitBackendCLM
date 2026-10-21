@@ -4,6 +4,8 @@ import com.suivicontrats.front.entity.Validations;
 import com.suivicontrats.front.service.ValidationsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import java.util.List;
 import java.util.Map;
 
@@ -21,14 +23,17 @@ public class ValidationsController {
     public Validations one(@PathVariable Long id){ return service.getOne(id); }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public Validations create(@RequestBody Validations validation){ return service.create(validation); }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public Validations update(@PathVariable Long id, @RequestBody Validations validation){
         return service.update(id, validation);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public void delete(@PathVariable Long id){ service.delete(id); }
 
     @GetMapping("/contrat/{contratId}")
@@ -37,13 +42,15 @@ public class ValidationsController {
     }
 
     @PostMapping("/contrat/{contratId}/generer")
-    public List<Validations> generer(@PathVariable Integer contratId, @RequestParam Integer demandeurId){
+    @PreAuthorize("hasAnyRole('ADMIN','GESTIONNAIRE')")
+    public List<Validations> generer(@PathVariable Integer contratId, @RequestParam(required = false) Integer demandeurId){
         return service.genererCircuit(contratId, demandeurId);
     }
 
     @PostMapping("/{id}/decider")
-    public Validations decider(@PathVariable Long id, @RequestBody Map<String,Object> body){
-        Integer valideurId = Integer.valueOf(body.get("valideurId").toString());
+    @PreAuthorize("hasRole('VALIDEUR')")
+    public Validations decider(@PathVariable Long id, @RequestBody Map<String,Object> body, Authentication authentication){
+        Integer valideurId = (Integer) authentication.getPrincipal();
         String decision = body.get("decision").toString();
         String commentaire = (String) body.getOrDefault("commentaire", "");
         return service.decider(id, valideurId, decision, commentaire);
