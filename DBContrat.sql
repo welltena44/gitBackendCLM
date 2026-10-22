@@ -5,11 +5,7 @@
 -- colonnes, index et le déclencheur de modification sont représentés ici.
 -- Seuls les comptes utilisateurs du dump sont conservés comme données;
 -- les contrats, validations, documents et autres données métier sont omis.
--- Les migrations DBMigrationDemandesReinitialisation.sql et
--- DBMigrationCircuitsEcheances.sql sont intégrées ci-dessous ; elles ne sont
--- pas nécessaires après l'exécution de ce script sur une base neuve.
--- Pour mettre à niveau une base existante sans la réinitialiser, exécuter
--- DBMigrationWorkflowSignature.sql à la place de ce script.
+-- Ce fichier est le script SQL unique du projet pour initialiser la base.
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;

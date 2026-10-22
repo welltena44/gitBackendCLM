@@ -1,3 +1,0 @@
--- Le schéma CLM neuf est créé explicitement avec DBContrat.sql à la racine.
--- L'initialisation SQL automatique de Spring Boot est désactivée dans
--- application.properties pour éviter une initialisation partielle au démarrage.
