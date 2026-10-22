@@ -18,6 +18,19 @@ public class JournauxAuditService {
     }
     public List<JournauxAudit> byContrat(Integer contratId){ return repo.findByContratIdOrderByDateActionDesc(contratId); }
     public List<JournauxAudit> byUser(Integer userId){ return repo.findByUtilisateurIdOrderByDateActionDesc(userId); }
+
+    public JournauxAudit record(Integer userId, Integer contractId, String contractReference,
+                                String action, String oldValue, String newValue) {
+        return repo.save(JournauxAudit.builder()
+                .utilisateurId(userId)
+                .contratId(contractId)
+                .referenceContrat(contractReference)
+                .action(action)
+                .ancienneValeur(oldValue)
+                .nouvelleValeur(newValue)
+                .build());
+    }
+
     public JournauxAudit save(JournauxAudit j){ j.setId(null); return repo.save(j); }
     public JournauxAudit update(Long id, JournauxAudit details){
         JournauxAudit journal = getOne(id);

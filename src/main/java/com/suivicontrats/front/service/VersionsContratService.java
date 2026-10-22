@@ -3,8 +3,6 @@ package com.suivicontrats.front.service;
 import com.suivicontrats.front.entity.VersionsContrat;
 import com.suivicontrats.front.repository.VersionsContratRepository;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -22,18 +20,10 @@ public class VersionsContratService {
     }
     public List<VersionsContrat> byContrat(Integer contratId){ contratService.getById(contratId); return repo.findByContratIdOrderByVersionAsc(contratId); }
     public VersionsContrat getOne(Long id){ VersionsContrat v = repo.findById(id).orElseThrow(() -> new RuntimeException("Version non trouvée")); contratService.getById(v.getContratId()); return v; }
-    public VersionsContrat save(VersionsContrat v){ requireAdmin(); contratService.getById(v.getContratId()); v.setId(null); return repo.save(v); }
+    public VersionsContrat save(VersionsContrat v){ throw new AccessDeniedException("Les versions sont créées automatiquement lors de l’enregistrement d’un avenant."); }
     public VersionsContrat update(Long id, VersionsContrat details){
-        requireAdmin();
-        VersionsContrat version = getOne(id);
-        contratService.getById(details.getContratId());
-        version.setContratId(details.getContratId());
-        version.setVersion(details.getVersion());
-        version.setContenu(details.getContenu());
-        version.setCreePar(details.getCreePar());
-        version.setAvenantId(details.getAvenantId());
-        return repo.save(version);
+        getOne(id);
+        throw new AccessDeniedException("Une version archivée est immuable.");
     }
-    public void delete(Long id){ requireAdmin(); getOne(id); repo.deleteById(id); }
-    private void requireAdmin(){ Authentication auth=SecurityContextHolder.getContext().getAuthentication(); if(auth==null||auth.getAuthorities().stream().noneMatch(a->a.getAuthority().equals("ROLE_ADMIN"))) throw new AccessDeniedException("Opération réservée à l'administrateur."); }
+    public void delete(Long id){ getOne(id); throw new AccessDeniedException("Une version archivée ne peut pas être supprimée."); }
 }

@@ -31,6 +31,10 @@ public class DocumentsContrat {
     @Column(name = "documents_contrat_type", length = 50)
     private String type; // pdf, docx, image...
 
+    @Column(name = "documents_contrat_categorie", nullable = false, length = 30)
+    @Builder.Default
+    private String categorie = "JUSTIFICATIF"; // JUSTIFICATIF, CONTRAT_SIGNE
+
     @Column(name = "documents_contrat_version", nullable = false)
     @Builder.Default
     private Integer version = 1;

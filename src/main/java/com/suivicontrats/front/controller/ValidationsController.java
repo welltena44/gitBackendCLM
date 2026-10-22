@@ -22,20 +22,6 @@ public class ValidationsController {
     @GetMapping("/{id}")
     public Validations one(@PathVariable Long id){ return service.getOne(id); }
 
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public Validations create(@RequestBody Validations validation){ return service.create(validation); }
-
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public Validations update(@PathVariable Long id, @RequestBody Validations validation){
-        return service.update(id, validation);
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public void delete(@PathVariable Long id){ service.delete(id); }
-
     @GetMapping("/contrat/{contratId}")
     public List<Validations> byContrat(@PathVariable Integer contratId){
         return service.getByContrat(contratId);

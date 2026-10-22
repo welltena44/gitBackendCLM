@@ -34,6 +34,11 @@ public class NotificationsController {
         return service.countNonLues(userId);
     }
 
+    @PutMapping("/user/{userId}/lu")
+    public int marquerToutesLues(@PathVariable Integer userId) {
+        return service.marquerToutesLues(userId);
+    }
+
     @PostMapping
     public Notifications create(@RequestBody Notifications n){ return service.save(n); }
 

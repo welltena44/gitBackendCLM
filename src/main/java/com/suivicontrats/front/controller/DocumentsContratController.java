@@ -33,9 +33,10 @@ public class DocumentsContratController {
     public DocumentsContrat upload(
             @PathVariable Integer contratId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "userId", required = false) Integer userId
+            @RequestParam(value = "userId", required = false) Integer userId,
+            @RequestParam(value = "categorie", defaultValue = "JUSTIFICATIF") String categorie
     ) throws IOException {
-        return service.upload(contratId, file, userId);
+        return service.upload(contratId, file, userId, categorie);
     }
 
     @GetMapping("/documents/{id}")

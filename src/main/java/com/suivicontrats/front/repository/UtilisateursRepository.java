@@ -8,4 +8,6 @@ public interface UtilisateursRepository extends JpaRepository<Utilisateurs, Inte
     Optional<Utilisateurs> findByMatricule(Integer matricule);
     Optional<Utilisateurs> findByEmailIgnoreCase(String email);
     boolean existsByEmailIgnoreCase(String email);
+    java.util.List<Utilisateurs> findByRoleAndActifTrue(Utilisateurs.Role role);
+    java.util.List<Utilisateurs> findByActifTrue();
 }

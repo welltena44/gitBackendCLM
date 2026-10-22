@@ -31,5 +31,8 @@ public class ReglesValidation {
     private Integer niveau; // 1, 2, 3...
 
     @Column(name = "regles_validation_role_requis", nullable = false, length = 30)
-    private String roleRequis; // ADMIN, GESTIONNAIRE, VALIDEUR, JURIDIQUE
+    private String roleRequis; // VALIDEUR
+
+    @Column(name = "regles_validation_valideur_id")
+    private Integer valideurId; // NULL = toute personne active ayant le rôle VALIDEUR
 }

@@ -25,4 +25,10 @@ public class ContratController {
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Integer id) { service.delete(id); }
+
+    @PostMapping("/{id}/signer")
+    public Contrat signer(@PathVariable Integer id) { return service.sign(id); }
+
+    @PostMapping("/{id}/resilier")
+    public Contrat resilier(@PathVariable Integer id) { return service.terminate(id); }
 }

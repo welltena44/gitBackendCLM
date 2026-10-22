@@ -7,4 +7,5 @@ import java.util.List;
 public interface DocumentsContratRepository extends JpaRepository<DocumentsContrat, Long> {
     List<DocumentsContrat> findByContratId(Integer contratId);
     List<DocumentsContrat> findByContratIdOrderByDateImportDesc(Integer contratId);
+    boolean existsByContratIdAndCategorie(Integer contratId, String categorie);
 }

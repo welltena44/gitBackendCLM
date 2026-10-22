@@ -14,6 +14,7 @@ import java.util.List;
 public class PartiesContratService {
     private final PartiesContratRepository repo;
     private final ContratService contratService;
+    private final JournauxAuditService audit;
 
     public List<PartiesContrat> getByContrat(Integer contratId){
         contratService.getById(contratId);
@@ -28,22 +29,28 @@ public class PartiesContratService {
 
     public PartiesContrat create(PartiesContrat p){
         if (!canManage()) throw new AccessDeniedException("Modification réservée au gestionnaire du contrat.");
-        contratService.getById(p.getContratId());
+        var contract = contratService.getById(p.getContratId());
         p.setId(null);
-        return repo.save(p);
+        PartiesContrat saved = repo.save(p);
+        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_AJOUTEE", null, "nom=" + saved.getNom() + "; type=" + saved.getType());
+        return saved;
     }
 
     public PartiesContrat update(Long id, PartiesContrat details){
         PartiesContrat p = getOne(id);
         if (!canManage()) throw new AccessDeniedException("Modification réservée au gestionnaire du contrat.");
+        String old = "nom=" + p.getNom() + "; type=" + p.getType();
         p.setNom(details.getNom());
         p.setType(details.getType());
         p.setEmail(details.getEmail());
         p.setTelephone(details.getTelephone());
-        return repo.save(p);
+        PartiesContrat saved = repo.save(p);
+        var contract = contratService.getById(saved.getContratId());
+        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_MODIFIEE", old, "nom=" + saved.getNom() + "; type=" + saved.getType());
+        return saved;
     }
 
-    public void delete(Long id){ getOne(id); if (!canManage()) throw new AccessDeniedException("Suppression réservée au gestionnaire du contrat."); repo.deleteById(id); }
+    public void delete(Long id){ PartiesContrat p = getOne(id); if (!canManage()) throw new AccessDeniedException("Suppression réservée au gestionnaire du contrat."); var contract = contratService.getById(p.getContratId()); audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_SUPPRIMEE", "nom=" + p.getNom() + "; type=" + p.getType(), null); repo.deleteById(id); }
     public List<PartiesContrat> getAll(){
         var allowed = contratService.getAll().stream().map(c -> c.getId()).collect(java.util.stream.Collectors.toSet());
         return repo.findAll().stream().filter(p -> allowed.contains(p.getContratId())).toList();
@@ -51,5 +58,9 @@ public class PartiesContratService {
     private boolean canManage(){
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_GESTIONNAIRE"));
+    }
+    private Integer currentUserId() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return principal instanceof Integer id ? id : null;
     }
 }

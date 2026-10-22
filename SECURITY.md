@@ -18,3 +18,5 @@ openssl rand -base64 48
 Pour le déploiement, copiez le résultat dans le gestionnaire de secrets ou l'environnement du serveur. Ne remplacez pas le secret de développement par une autre valeur committée dans le dépôt.
 
 Les jetons expirent après 30 minutes. Un compte désactivé ou dont le rôle a changé est rechargé depuis la base à chaque requête et perd immédiatement l'accès correspondant. Si l'authentification à deux facteurs est activée pour un compte, son code à six chiffres est requis à la connexion.
+
+Les valeurs de repli présentes dans `application.properties` servent uniquement au développement local. En production, fournissez `CLM_JWT_SECRET`, `DB_PASSWORD`, `DB_USERNAME` et `DB_URL` via le gestionnaire de secrets de l'environnement. Configurez également `MAIL_USERNAME` et `MAIL_PASSWORD` si l'envoi SMTP est activé.
