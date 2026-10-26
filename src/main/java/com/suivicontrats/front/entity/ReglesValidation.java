@@ -35,4 +35,7 @@ public class ReglesValidation {
 
     @Column(name = "regles_validation_valideur_id")
     private Integer valideurId; // NULL = toute personne active ayant le rôle VALIDEUR
+
+    @Transient
+    private Long regleSourceId; // Seuil existant à reprendre lors de l'ajout d'une étape par l'Admin
 }

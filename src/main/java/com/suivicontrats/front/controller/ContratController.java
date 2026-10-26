@@ -14,6 +14,9 @@ public class ContratController {
     @GetMapping
     public List<Contrat> all() { return service.getAll(); }
 
+    @GetMapping("/a-approuver")
+    public List<Contrat> aApprouver() { return service.getPendingLegalApproval(); }
+
     @GetMapping("/{id}")
     public Contrat one(@PathVariable Integer id) { return service.getById(id); }
 

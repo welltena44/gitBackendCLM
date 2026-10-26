@@ -30,17 +30,23 @@ public class ReglesValidationService {
     public ReglesValidation create(ReglesValidation r){
         Authentication auth = requireAdminOrJuridique();
         if (hasRole(auth, "ADMIN")) {
-            // L'administrateur configure l'étape et son rôle, pas le seuil métier.
-            r.setTypeContratId(null);
-            r.setMontantMinimum(BigDecimal.ZERO);
-            r.setMontantMaximum(null);
+            // L'Admin choisit le type et le circuit; le seuil financier vient du Juridique.
+            if (r.getRegleSourceId() == null)
+                throw new IllegalArgumentException("Sélectionnez un seuil juridique auquel rattacher cette étape.");
+            if (r.getTypeContratId() == null)
+                throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
+            ReglesValidation source = getOne(r.getRegleSourceId());
+            r.setMontantMinimum(source.getMontantMinimum());
+            r.setMontantMaximum(source.getMontantMaximum());
         } else {
-            // Le juridique définit les seuils; l'étape est configurée par l'administrateur.
+            // Le Juridique définit les seuils financiers globaux; le type relève du circuit Admin.
+            r.setTypeContratId(null);
             r.setNiveau(1);
             r.setRoleRequis("VALIDEUR");
             r.setValideurId(null);
         }
         validate(r);
+        ensureUniqueLevel(r, null);
         r.setId(null);
         return repo.save(r);
     }
@@ -55,6 +61,12 @@ public class ReglesValidationService {
             existing.setMontantMaximum(r.getMontantMaximum());
         } else {
             validateWorkflow(r);
+            if (r.getTypeContratId() == null)
+                throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
+            r.setMontantMinimum(existing.getMontantMinimum());
+            r.setMontantMaximum(existing.getMontantMaximum());
+            ensureUniqueLevel(r, id);
+            existing.setTypeContratId(r.getTypeContratId());
             existing.setNiveau(r.getNiveau());
             existing.setRoleRequis(r.getRoleRequis());
             existing.setValideurId(r.getValideurId());
@@ -76,14 +88,43 @@ public class ReglesValidationService {
 
     private void validateWorkflow(ReglesValidation r) {
         if (r.getNiveau() == null || r.getNiveau() < 1) throw new IllegalArgumentException("Le niveau de validation doit être positif.");
-        if (!"VALIDEUR".equals(r.getRoleRequis()))
-            throw new IllegalArgumentException("Seul le rôle VALIDEUR peut être configuré dans un circuit.");
+        if (!List.of("VALIDEUR", "JURIDIQUE", "VALIDEUR_ET_JURIDIQUE").contains(r.getRoleRequis()))
+            throw new IllegalArgumentException("Le rôle requis doit être VALIDEUR, JURIDIQUE ou les deux.");
+        if ("VALIDEUR_ET_JURIDIQUE".equals(r.getRoleRequis()) && r.getValideurId() == null)
+            throw new IllegalArgumentException("Choisissez le valideur chargé de cette étape conjointe.");
         if (r.getValideurId() != null) {
             Utilisateurs user = utilisateursRepo.findById(r.getValideurId())
-                    .orElseThrow(() -> new IllegalArgumentException("Le valideur sélectionné n'existe pas."));
-            if (user.getRole() != Utilisateurs.Role.VALIDEUR || !Boolean.TRUE.equals(user.getActif()))
-                throw new IllegalArgumentException("Le compte choisi doit être un valideur actif.");
+                    .orElseThrow(() -> new IllegalArgumentException("L'utilisateur sélectionné n'existe pas."));
+            String expectedRole = "VALIDEUR_ET_JURIDIQUE".equals(r.getRoleRequis()) ? "VALIDEUR" : r.getRoleRequis();
+            if (!user.getRole().name().equals(expectedRole) || !Boolean.TRUE.equals(user.getActif()))
+                throw new IllegalArgumentException("L'utilisateur ciblé doit être actif et avoir le rôle " + expectedRole + ".");
         }
+    }
+
+    private void ensureUniqueLevel(ReglesValidation candidate, Long excludedId) {
+        boolean duplicate = repo.findAll().stream()
+                .filter(existing -> excludedId == null || !excludedId.equals(existing.getId()))
+                .anyMatch(existing -> java.util.Objects.equals(existing.getTypeContratId(), candidate.getTypeContratId())
+                        && sameAmount(existing.getMontantMinimum(), candidate.getMontantMinimum())
+                        && sameAmount(existing.getMontantMaximum(), candidate.getMontantMaximum())
+                        && java.util.Objects.equals(existing.getNiveau(), candidate.getNiveau())
+                        && overlapsRoles(existing.getRoleRequis(), candidate.getRoleRequis()));
+        if (duplicate)
+            throw new IllegalArgumentException("Ce seuil possède déjà une étape pour ce rôle à ce niveau.");
+    }
+
+    private boolean overlapsRoles(String first, String second) {
+        return rolesIn(first).stream().anyMatch(rolesIn(second)::contains);
+    }
+
+    private java.util.Set<String> rolesIn(String role) {
+        return "VALIDEUR_ET_JURIDIQUE".equals(role)
+                ? java.util.Set.of("VALIDEUR", "JURIDIQUE")
+                : java.util.Set.of(role);
+    }
+
+    private boolean sameAmount(BigDecimal first, BigDecimal second) {
+        return first == null ? second == null : second != null && first.compareTo(second) == 0;
     }
 
     public void delete(Long id){
@@ -108,12 +149,23 @@ public class ReglesValidationService {
 
     // C'est ce que tu vas appeler pour un contrat
     public List<ReglesValidation> getCircuit(Long typeContratId, BigDecimal montant){
-        java.util.Map<Integer, ReglesValidation> byLevel = new java.util.HashMap<>();
+        java.util.Map<Integer, List<ReglesValidation>> byLevel = new java.util.HashMap<>();
         for (ReglesValidation rule : repo.findCircuitApplicable(typeContratId, montant)) {
-            ReglesValidation current = byLevel.get(rule.getNiveau());
-            if (current == null || (rule.getTypeContratId() != null && rule.getTypeContratId().equals(typeContratId)))
-                byLevel.put(rule.getNiveau(), rule);
+            byLevel.computeIfAbsent(rule.getNiveau(), ignored -> new java.util.ArrayList<>()).add(rule);
         }
-        return byLevel.values().stream().sorted(java.util.Comparator.comparing(ReglesValidation::getNiveau)).toList();
+        return byLevel.entrySet().stream().sorted(java.util.Map.Entry.comparingByKey())
+                .flatMap(entry -> {
+                    List<ReglesValidation> rules = entry.getValue();
+                    java.util.Set<String> typeSpecificRoles = rules.stream()
+                            .filter(r -> typeContratId != null && typeContratId.equals(r.getTypeContratId()))
+                            .flatMap(r -> rolesIn(r.getRoleRequis()).stream())
+                            .collect(java.util.stream.Collectors.toSet());
+                    // Une règle propre au type remplace le rôle correspondant de la règle globale,
+                    // sans effacer une approbation globale distincte au même niveau.
+                    return rules.stream().filter(r -> {
+                        if (typeContratId != null && typeContratId.equals(r.getTypeContratId())) return true;
+                        return rolesIn(r.getRoleRequis()).stream().noneMatch(typeSpecificRoles::contains);
+                    });
+                }).toList();
     }
 }

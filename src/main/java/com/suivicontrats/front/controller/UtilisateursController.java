@@ -28,7 +28,7 @@ public class UtilisateursController {
         List<Utilisateurs> users = service.all();
         boolean admin = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         if (admin) return ResponseEntity.<List<?>>ok(users);
-        List<UserDirectoryDTO> directory = users.stream().map(u -> new UserDirectoryDTO(u.getId(), u.getNom(), u.getPrenom(), u.getService())).toList();
+        List<UserDirectoryDTO> directory = users.stream().map(u -> new UserDirectoryDTO(u.getId(), u.getMatricule(), u.getNom(), u.getPrenom(), u.getService())).toList();
         return ResponseEntity.<List<?>>ok(directory);
     }
 

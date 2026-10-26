@@ -37,6 +37,18 @@ public class ContratService {
         }
         throw new AccessDeniedException("Accès interdit");
     }
+
+    public List<Contrat> getPendingLegalApproval() {
+        Authentication auth = currentAuth();
+        if (!hasRole(auth, "ADMIN") && !hasRole(auth, "JURIDIQUE")) {
+            throw new AccessDeniedException("Consultation réservée au juridique ou à l'administrateur.");
+        }
+        var contractIds = validationsRepo.findByDecision("EN_ATTENTE").stream()
+                .filter(validation -> "JURIDIQUE".equals(validation.getRoleRequis()))
+                .map(Validations::getContratId)
+                .collect(java.util.stream.Collectors.toSet());
+        return contratRepo.findAllById(contractIds);
+    }
     public Contrat getById(Integer id) {
         Contrat contract = contratRepo.findById(id).orElseThrow(() -> new RuntimeException("Contrat non trouvé"));
         assertCanAccess(contract);

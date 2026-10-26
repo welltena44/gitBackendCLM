@@ -9,6 +9,7 @@ import com.suivicontrats.front.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.suivicontrats.front.service.JournauxAuditService;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,7 @@ public class AuthService {
     private final UtilisateursRepository repo;
     private final PasswordEncoder encoder;
     private final JwtService jwtService;
+    private final JournauxAuditService auditService;
     public LoginResponse login(LoginRequest req) {
 
         // Recherche par matricule
@@ -46,6 +48,10 @@ public class AuthService {
             !encoder.matches(req.getMotDePasse(), u.getMotDePasse())) {
             throw new RuntimeException("Mot de passe incorrect");
         }
+
+        // Trace la connexion réussie dans le journal d'audit.
+        auditService.record(u.getId(), null, null, "CONNEXION", null,
+            "Connexion réussie pour le matricule " + u.getMatricule());
 
         return LoginResponse.builder()
             .id(u.getId())

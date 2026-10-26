@@ -5,7 +5,8 @@
 -- colonnes, index et le déclencheur de modification sont représentés ici.
 -- Seuls les comptes utilisateurs du dump sont conservés comme données;
 -- les contrats, validations, documents et autres données métier sont omis.
--- Ce fichier est le script SQL unique du projet pour initialiser la base.
+-- Les tables métier et leurs contraintes sont définies ci-dessous. Pour une
+-- base existante, appliquer les ajustements de schéma nécessaires avant usage.
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -111,7 +112,7 @@ CREATE TABLE parties_contrat (
     parties_contrat_id          BIGSERIAL PRIMARY KEY,
     parties_contrat_contrat_id  INTEGER       NOT NULL REFERENCES contrats(contrats_id) ON DELETE CASCADE,
     parties_contrat_nom         VARCHAR(150)  NOT NULL,
-    parties_contrat_type        VARCHAR(50)   CHECK (parties_contrat_type IN ('FOURNISSEUR', 'CLIENT', 'PARTENAIRE', 'PRESTATAIRE', 'AUTRE')),
+    parties_contrat_type        VARCHAR(50)   CHECK (parties_contrat_type IN ('COCONTRACTANT', 'FOURNISSEUR', 'CLIENT', 'PARTENAIRE', 'PRESTATAIRE', 'SOUS-TRAITANT', 'AUTRE')),
     parties_contrat_email       VARCHAR(150),
     parties_contrat_telephone   VARCHAR(30)
 );
@@ -145,7 +146,7 @@ CREATE TABLE regles_validation (
     regles_validation_montant_maximum  NUMERIC(15,2),
     regles_validation_niveau           INTEGER       NOT NULL CHECK (regles_validation_niveau > 0),
     regles_validation_role_requis      VARCHAR(30)   NOT NULL
-                      CHECK (regles_validation_role_requis = 'VALIDEUR'),
+                      CHECK (regles_validation_role_requis IN ('VALIDEUR', 'JURIDIQUE', 'VALIDEUR_ET_JURIDIQUE')),
     regles_validation_valideur_id      INTEGER       REFERENCES utilisateurs(utilisateurs_id) ON DELETE SET NULL,
     CONSTRAINT chk_montants CHECK (regles_validation_montant_maximum IS NULL OR regles_validation_montant_maximum > regles_validation_montant_minimum)
 );
@@ -160,7 +161,7 @@ CREATE TABLE validations (
     validations_demandeur_id     INTEGER     REFERENCES utilisateurs(utilisateurs_id),
     validations_niveau           INTEGER     NOT NULL CHECK (validations_niveau > 0),
     validations_role_requis      VARCHAR(30) NOT NULL
-                     CHECK (validations_role_requis = 'VALIDEUR'),
+                     CHECK (validations_role_requis IN ('VALIDEUR', 'JURIDIQUE')),
     validations_cycle            INTEGER     NOT NULL DEFAULT 1 CHECK (validations_cycle > 0),
     validations_decision         VARCHAR(30) NOT NULL DEFAULT 'EN_ATTENTE'
                      CHECK (validations_decision IN ('EN_ATTENTE', 'A_VENIR', 'NON_REQUISE', 'APPROUVE', 'REJETE', 'MODIFICATION_DEMANDEE')),
@@ -171,7 +172,7 @@ CREATE TABLE validations (
 
 CREATE INDEX idx_validations_contract ON validations(validations_contrat_id);
 CREATE INDEX idx_validations_decision ON validations(validations_decision);
-CREATE UNIQUE INDEX uq_validation_cycle_niveau ON validations(validations_contrat_id, validations_cycle, validations_niveau);
+CREATE UNIQUE INDEX uq_validation_cycle_niveau ON validations(validations_contrat_id, validations_cycle, validations_niveau, validations_role_requis);
 
 -- Équivalent des contraintes de la migration multi-niveaux : les étapes
 -- futures et celles annulées par un rejet/demande de correction sont conservées.

@@ -55,14 +55,24 @@ public class ValidationsService {
         List<com.suivicontrats.front.entity.ReglesValidation> circuit = reglesValidationService.getCircuit(contract.getTypeId(), contract.getMontant());
         if (circuit.isEmpty()) throw new IllegalArgumentException("Aucune règle de validation ne couvre le type et le montant de ce contrat.");
         List<Validations> steps = new java.util.ArrayList<>();
+        Integer firstLevel = circuit.stream().map(com.suivicontrats.front.entity.ReglesValidation::getNiveau)
+                .min(Integer::compareTo).orElseThrow();
         for (var rule : circuit) {
-            if (!"VALIDEUR".equals(rule.getRoleRequis())) {
-                throw new IllegalArgumentException("Chaque étape du circuit doit être attribuée au rôle VALIDEUR.");
-            }
-            steps.add(Validations.builder().contratId(contratId).demandeurId(demandeurId)
-                    .niveau(rule.getNiveau()).roleRequis(rule.getRoleRequis()).valideurId(rule.getValideurId()).cycle(cycle)
-                    .decision(steps.isEmpty() ? "EN_ATTENTE" : "A_VENIR")
+            List<String> requiredRoles = switch (rule.getRoleRequis()) {
+                case "VALIDEUR" -> List.of("VALIDEUR");
+                case "JURIDIQUE" -> List.of("JURIDIQUE");
+                case "VALIDEUR_ET_JURIDIQUE" -> List.of("VALIDEUR", "JURIDIQUE");
+                default -> throw new IllegalArgumentException("Rôle requis invalide dans le circuit.");
+            };
+            for (String requiredRole : requiredRoles) {
+                steps.add(Validations.builder().contratId(contratId).demandeurId(demandeurId)
+                    .niveau(rule.getNiveau()).roleRequis(requiredRole)
+                    .valideurId("VALIDEUR_ET_JURIDIQUE".equals(rule.getRoleRequis())
+                            ? ("VALIDEUR".equals(requiredRole) ? rule.getValideurId() : null)
+                            : rule.getValideurId()).cycle(cycle)
+                    .decision(rule.getNiveau().equals(firstLevel) ? "EN_ATTENTE" : "A_VENIR")
                     .dateSoumission(LocalDateTime.now()).build());
+            }
         }
         List<Validations> saved = validationsRepo.saveAll(steps);
         String ancienStatut = contract.getStatut();
@@ -70,7 +80,8 @@ public class ValidationsService {
         contratRepo.save(contract);
 
         String reference = contract.getReference() == null ? "#" + contratId : contract.getReference();
-        notifierEtape(saved.get(0), reference);
+        saved.stream().filter(step -> step.getNiveau().equals(firstLevel))
+                .forEach(step -> notifierEtape(step, reference));
         journauxAuditService.record(
                 demandeurId, contratId, reference, "CONTRAT_SOUMIS_VALIDATION",
                 "statut=" + ancienStatut, "statut=EN_VALIDATION; cycle=" + cycle);
@@ -84,10 +95,12 @@ public class ValidationsService {
         if (!List.of("APPROUVE", "REJETE", "MODIFICATION_DEMANDEE").contains(decision)) {
             throw new IllegalArgumentException("Décision de validation invalide");
         }
-        if (!hasRole(auth, "VALIDEUR")) throw new AccessDeniedException("Seul un valideur peut décider sur un contrat.");
+        if ("MODIFICATION_DEMANDEE".equals(decision) && (commentaire == null || commentaire.isBlank())) {
+            throw new IllegalArgumentException("Un commentaire est obligatoire pour justifier la demande de modification.");
+        }
         Validations v = getOne(validationId);
         String requiredRole = "ROLE_" + v.getRoleRequis();
-        if (!"ROLE_VALIDEUR".equals(requiredRole)
+        if (!List.of("ROLE_VALIDEUR", "ROLE_JURIDIQUE").contains(requiredRole)
                 || auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals(requiredRole))
                 || !"EN_ATTENTE".equals(v.getDecision())
                 || (v.getValideurId() != null && !v.getValideurId().equals(valideurId))) {
@@ -99,18 +112,38 @@ public class ValidationsService {
         v.setDateValidation(LocalDateTime.now());
         Validations saved = validationsRepo.save(v);
         List<Validations> cycleSteps = validationsRepo.findByContratIdAndCycleOrderByNiveauAsc(v.getContratId(), v.getCycle());
-        Validations nextStep = cycleSteps.stream().filter(s -> s.getNiveau() > v.getNiveau() && "A_VENIR".equals(s.getDecision())).findFirst().orElse(null);
-        if ("APPROUVE".equals(decision) && nextStep != null) {
-            nextStep.setDecision("EN_ATTENTE");
-            validationsRepo.save(nextStep);
-            contratRepo.findById(v.getContratId()).ifPresent(c -> notificationsService.notifyUser(c.getResponsableId(), c.getId(), "Étape de validation approuvée", "Le niveau " + v.getNiveau() + " du contrat " + c.getReference() + " est approuvé. Le dossier passe au niveau " + nextStep.getNiveau() + ".", "VALIDATION"));
-            notifierEtape(nextStep, contratRepo.findById(v.getContratId()).map(Contrat::getReference).orElse("#" + v.getContratId()));
-        } else if (!"APPROUVE".equals(decision)) {
-            cycleSteps.stream().filter(s -> "A_VENIR".equals(s.getDecision())).forEach(s -> { s.setDecision("NON_REQUISE"); validationsRepo.save(s); });
+        List<Validations> sameLevel = cycleSteps.stream().filter(s -> s.getNiveau().equals(v.getNiveau())).toList();
+        boolean levelApproved = sameLevel.stream().allMatch(s -> s.getId().equals(saved.getId())
+                ? "APPROUVE".equals(decision) : "APPROUVE".equals(s.getDecision()));
+        if (!"APPROUVE".equals(decision)) {
+            cycleSteps.stream().filter(s -> ("A_VENIR".equals(s.getDecision())
+                            || (s.getNiveau().equals(v.getNiveau()) && "EN_ATTENTE".equals(s.getDecision())))
+                            && !s.getId().equals(saved.getId()))
+                    .forEach(s -> { s.setDecision("NON_REQUISE"); validationsRepo.save(s); });
+            cycleSteps.stream().filter(s -> "A_VENIR".equals(s.getDecision()))
+                    .forEach(s -> { s.setDecision("NON_REQUISE"); validationsRepo.save(s); });
         }
+
+        List<Validations> nextLevelSteps = List.of();
+        if ("APPROUVE".equals(decision) && levelApproved) {
+            Integer nextLevel = cycleSteps.stream()
+                    .filter(s -> s.getNiveau() > v.getNiveau() && "A_VENIR".equals(s.getDecision()))
+                    .map(Validations::getNiveau).min(Integer::compareTo).orElse(null);
+            if (nextLevel != null) {
+                nextLevelSteps = cycleSteps.stream().filter(s -> s.getNiveau().equals(nextLevel)
+                        && "A_VENIR".equals(s.getDecision())).toList();
+                for (Validations next : nextLevelSteps) next.setDecision("EN_ATTENTE");
+                validationsRepo.saveAll(nextLevelSteps);
+            }
+        }
+        final List<Validations> activatedSteps = nextLevelSteps;
+        final boolean approvalsComplete = "APPROUVE".equals(decision) && levelApproved && activatedSteps.isEmpty();
+        final boolean waitingForCoApproval = "APPROUVE".equals(decision) && !levelApproved;
+        String reference = contratRepo.findById(v.getContratId()).map(Contrat::getReference).orElse("#" + v.getContratId());
+        activatedSteps.forEach(step -> notifierEtape(step, reference));
         contratRepo.findById(v.getContratId()).ifPresent(contract -> {
             String ancienStatut = contract.getStatut();
-            if ("APPROUVE".equals(decision) && nextStep == null) contract.setStatut("APPROUVE");
+            if (approvalsComplete) contract.setStatut("APPROUVE");
             else if ("APPROUVE".equals(decision)) contract.setStatut("EN_VALIDATION");
             else if ("REJETE".equals(decision)) contract.setStatut("REJETE");
             else contract.setStatut("BROUILLON");
@@ -128,11 +161,15 @@ public class ValidationsService {
                     "statut=" + ancienStatut + "; decision=EN_ATTENTE", nouvelleValeur);
 
             Integer responsableId = contract.getResponsableId();
-            if ("MODIFICATION_DEMANDEE".equals(decision)) {
-                String message = "Le valideur a demandé des modifications pour le contrat " + contract.getReference() + ".";
-                if (commentaire != null && !commentaire.isBlank()) message += " Commentaire : " + commentaire.trim();
+            String acteur = "JURIDIQUE".equals(v.getRoleRequis()) ? "Le Juridique" : "Le valideur";
+            if (waitingForCoApproval) {
+                notificationsService.notifyUser(responsableId, contract.getId(), "Approbation partielle",
+                        acteur + " a donné son accord à l'étape " + v.getNiveau() + " du contrat " + contract.getReference()
+                                + "; l'autre rôle requis doit encore approuver.", "VALIDATION");
+            } else if ("MODIFICATION_DEMANDEE".equals(decision)) {
+                String message = acteur + " a demandé des modifications pour le contrat " + contract.getReference() + ". Commentaire : " + commentaire.trim();
                 notificationsService.notifyUser(responsableId, contract.getId(), "Modifications demandées", message, "VALIDATION");
-            } else if ("APPROUVE".equals(decision) && nextStep == null) {
+            } else if (approvalsComplete) {
                 notificationsService.notifyUser(responsableId, contract.getId(), "Contrat approuvé", "Le contrat " + contract.getReference() + " a été approuvé.", "VALIDATION");
             } else if ("REJETE".equals(decision)) {
                 String message = "Le contrat " + contract.getReference() + " a été rejeté.";
@@ -143,28 +180,59 @@ public class ValidationsService {
         return saved;
     }
 
+    /**
+     * Envoie une notification uniquement au rôle de cette étape (ou à l'utilisateur
+     * explicitement affecté). Dans un circuit double, chaque étape possède son rôle.
+     */
     private void notifierEtape(Validations validation, String reference) {
-        String title = "Contrat à valider";
-        String message = "Le contrat " + reference + " attend une validation de niveau " + validation.getNiveau() + ".";
+        String title = "JURIDIQUE".equals(validation.getRoleRequis())
+                ? "Contrat à approuver par le Juridique" : "Contrat à valider";
+        String message = "Le contrat " + reference + " attend votre validation de niveau " + validation.getNiveau() + ".";
         if (validation.getValideurId() != null) {
             notificationsService.notifyUser(validation.getValideurId(), validation.getContratId(), title, message, "VALIDATION");
         } else {
-            notificationsService.notifyUsers(utilisateursRepo.findByRoleAndActifTrue(Utilisateurs.Role.VALIDEUR), validation.getContratId(), title, message, "VALIDATION");
+            Utilisateurs.Role role = Utilisateurs.Role.valueOf(validation.getRoleRequis());
+            notificationsService.notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), validation.getContratId(), title, message, "VALIDATION");
         }
     }
 
+    /**
+     * Retourne uniquement les étapes visibles par le compte connecté.
+     * Un valideur et le service juridique ne doivent jamais consulter les
+     * décisions ni les commentaires internes de l'autre rôle.
+     */
     public List<Validations> all(){
         Authentication auth = currentAuth();
-        if (hasRole(auth, "ADMIN") || hasRole(auth, "JURIDIQUE")) return validationsRepo.findAll();
+
+        // L'administrateur conserve une vue globale d'audit.
+        if (hasRole(auth, "ADMIN")) return validationsRepo.findAll();
+
         Integer userId = currentUserId(auth);
         var rows = validationsRepo.findAll();
-        if (hasRole(auth, "GESTIONNAIRE")) return rows.stream().filter(v -> userId.equals(v.getDemandeurId())
-                || (auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + v.getRoleRequis()))
-                && (userId.equals(v.getValideurId())
-                || (v.getValideurId() == null && "EN_ATTENTE".equals(v.getDecision()))))).toList();
-        return rows.stream().filter(v -> auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + v.getRoleRequis()))
-                && (userId.equals(v.getValideurId())
-                || (v.getValideurId() == null && "EN_ATTENTE".equals(v.getDecision())))).toList();
+
+        // Le gestionnaire suit les validations de ses contrats et ses propres demandes.
+        if (hasRole(auth, "GESTIONNAIRE")) {
+            return rows.stream().filter(v -> userId.equals(v.getDemandeurId())
+                    || (auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + v.getRoleRequis()))
+                    && (userId.equals(v.getValideurId())
+                    || (v.getValideurId() == null && "EN_ATTENTE".equals(v.getDecision()))))).toList();
+        }
+
+        // Les rôles de validation ne reçoivent que leurs étapes propres.
+        // Les étapes attribuées à un utilisateur précis restent privées de ce compte.
+        boolean isValideur = hasRole(auth, "VALIDEUR");
+        boolean isJuridique = hasRole(auth, "JURIDIQUE");
+        if (isValideur || isJuridique) {
+            String roleVisible = isJuridique ? "JURIDIQUE" : "VALIDEUR";
+            return rows.stream()
+                    .filter(v -> roleVisible.equals(v.getRoleRequis()))
+                    .filter(v -> userId.equals(v.getValideurId())
+                            || (v.getValideurId() == null && "EN_ATTENTE".equals(v.getDecision())))
+                    .toList();
+        }
+
+        // Par défaut, aucun autre rôle ne dispose d'une liste de validations.
+        throw new AccessDeniedException("Accès interdit aux validations.");
     }
 
     public Validations create(Validations validation) {

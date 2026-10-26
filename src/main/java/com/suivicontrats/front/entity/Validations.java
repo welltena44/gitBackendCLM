@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_validations_decision", columnList = "validations_decision")
 }, uniqueConstraints = @UniqueConstraint(
         name = "uq_validation_cycle_niveau",
-        columnNames = {"validations_contrat_id", "validations_cycle", "validations_niveau"}))
+        columnNames = {"validations_contrat_id", "validations_cycle", "validations_niveau", "validations_role_requis"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

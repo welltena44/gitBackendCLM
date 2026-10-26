@@ -34,11 +34,14 @@ public class ValidationsController {
     }
 
     @PostMapping("/{id}/decider")
-    @PreAuthorize("hasRole('VALIDEUR')")
+    @PreAuthorize("hasAnyRole('VALIDEUR','JURIDIQUE')")
     public Validations decider(@PathVariable Long id, @RequestBody Map<String,Object> body, Authentication authentication){
         Integer valideurId = (Integer) authentication.getPrincipal();
-        String decision = body.get("decision").toString();
-        String commentaire = (String) body.getOrDefault("commentaire", "");
+        Object decisionValue = body.get("decision");
+        if (decisionValue == null) throw new IllegalArgumentException("La décision est obligatoire.");
+        String decision = decisionValue.toString();
+        Object commentaireValue = body.get("commentaire");
+        String commentaire = commentaireValue == null ? "" : commentaireValue.toString();
         return service.decider(id, valideurId, decision, commentaire);
     }
 }
