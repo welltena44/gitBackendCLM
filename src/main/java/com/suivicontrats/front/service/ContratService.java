@@ -1,5 +1,6 @@
 package com.suivicontrats.front.service;
 import com.suivicontrats.front.entity.Contrat;
+import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.ValidationsRepository;
 import com.suivicontrats.front.repository.DocumentsContratRepository;
@@ -20,6 +21,8 @@ public class ContratService {
     private final ValidationsRepository validationsRepo;
     private final DocumentsContratRepository documentsRepo;
     private final JournauxAuditService journauxAuditService;
+    private final ReglesValidationService reglesValidationService;
+    private final NotificationsService notificationsService;
 
     public List<Contrat> getAll() {
         Authentication auth = currentAuth();
@@ -76,6 +79,15 @@ public class ContratService {
         Contrat saved = contratRepo.save(contrat);
         journauxAuditService.record(currentUserId(auth), saved.getId(), saved.getReference(),
                 "CONTRAT_CREE", null, auditSummary(saved));
+        if (reglesValidationService.getCircuit(saved.getTypeId(), saved.getMontant()).isEmpty()) {
+            String message = "Aucune règle active ne couvre le type et le montant du contrat "
+                + saved.getReference() + " (" + saved.getMontant().toPlainString() + " " + saved.getDevise()
+                + "). Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
+            notificationsService.notifyContractRole(Utilisateurs.Role.ADMIN, saved.getId(),
+                "Aucune règle de validation applicable", message, "INFO");
+            notificationsService.notifyContractRole(Utilisateurs.Role.JURIDIQUE, saved.getId(),
+                "Aucune règle de validation applicable", message, "INFO");
+        }
         return saved;
     }
     @Transactional

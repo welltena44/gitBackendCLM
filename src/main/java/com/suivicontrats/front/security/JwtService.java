@@ -45,6 +45,14 @@ public class JwtService {
     }
 
     public Integer verifyAndGetUserId(String token) {
+        return verifyAndGetUserId(token, true);
+    }
+
+    public Integer verifySignatureAndGetUserId(String token) {
+        return verifyAndGetUserId(token, false);
+    }
+
+    private Integer verifyAndGetUserId(String token, boolean checkExpiration) {
         try {
             String[] parts = token.split("\\.");
             if (parts.length != 3 || !constantTimeEquals(sign(parts[0] + "." + parts[1]), Base64.getUrlDecoder().decode(parts[2]))) {
@@ -53,7 +61,7 @@ public class JwtService {
             Map<?, ?> claims = objectMapper.readValue(Base64.getUrlDecoder().decode(parts[1]), Map.class);
             long expiresAt = ((Number) claims.get("exp")).longValue();
             long userId = ((Number) claims.get("sub")).longValue();
-            if (expiresAt <= Instant.now().getEpochSecond() || userId <= 0 || userId > Integer.MAX_VALUE) return null;
+            if ((checkExpiration && expiresAt <= Instant.now().getEpochSecond()) || userId <= 0 || userId > Integer.MAX_VALUE) return null;
             return (int) userId;
         } catch (Exception e) {
             return null;

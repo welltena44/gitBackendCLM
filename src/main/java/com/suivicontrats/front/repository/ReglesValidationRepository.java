@@ -18,6 +18,7 @@ public interface ReglesValidationRepository extends JpaRepository<ReglesValidati
            "(r.typeContratId = :typeId OR r.typeContratId IS NULL) AND " +
            "r.montantMinimum <= :montant AND " +
            "(r.montantMaximum IS NULL OR r.montantMaximum > :montant) " +
+            "AND r.statut = 'ACTIVE' " +
            "ORDER BY r.niveau ASC")
     List<ReglesValidation> findCircuitApplicable(
             @Param("typeId") Long typeContratId,

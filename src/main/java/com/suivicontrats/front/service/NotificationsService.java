@@ -44,6 +44,38 @@ public class NotificationsService {
                 .type(type).lu(false).build());
     }
 
+    @Transactional
+    public void notifyRuleUsers(List<Utilisateurs> users, Long ruleId, String title, String message) {
+        if (users == null || users.isEmpty()) return;
+        users.stream().map(Utilisateurs::getId).filter(java.util.Objects::nonNull).distinct()
+                .forEach(userId -> repo.save(Notifications.builder()
+                        .utilisateurId(userId).regleValidationId(ruleId)
+                        .titre(truncate(title, 150)).message(truncate(message, 500))
+                        .type("INFO").lu(false).build()));
+    }
+
+    @Transactional
+    public void notifyRuleRole(Utilisateurs.Role role, Long ruleId, String title, String message) {
+        notifyRuleUsers(utilisateursRepo.findByRoleAndActifTrue(role), ruleId, title, message);
+    }
+
+    @Transactional
+    public void notifyContractRole(Utilisateurs.Role role, Integer contractId, String title, String message, String type) {
+        notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), contractId, title, message, type);
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void notifyMissingRuleForContract(Integer contractId, String title, String message) {
+        for (Utilisateurs.Role role : List.of(Utilisateurs.Role.ADMIN, Utilisateurs.Role.JURIDIQUE)) {
+            utilisateursRepo.findByRoleAndActifTrue(role).stream()
+                    .map(Utilisateurs::getId)
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .filter(userId -> !repo.existsByUtilisateurIdAndContratIdAndTitre(userId, contractId, title))
+                    .forEach(userId -> saveForUser(userId, contractId, title, message, "INFO"));
+        }
+    }
+
     private String truncate(String value, int maxLength) {
         if (value == null) return "";
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
@@ -61,6 +93,7 @@ public class NotificationsService {
         notification.setUtilisateurId(details.getUtilisateurId());
         notification.setContratId(details.getContratId());
         notification.setParametreAlerteId(details.getParametreAlerteId());
+        notification.setRegleValidationId(details.getRegleValidationId());
         notification.setTitre(details.getTitre());
         notification.setMessage(details.getMessage());
         notification.setType(details.getType());

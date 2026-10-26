@@ -1,20 +1,14 @@
 -- =====================================================================
--- CLM - Initialisation complète d'une base PostgreSQL neuve
--- ATTENTION : ce script supprime les tables CLM existantes et leurs données.
--- Le schéma a été comparé au dump suiviContrats.sql : toutes ses tables,
--- colonnes, index et le déclencheur de modification sont représentés ici.
--- Seuls les comptes utilisateurs du dump sont conservés comme données;
--- les contrats, validations, documents et autres données métier sont omis.
--- Les tables métier et leurs contraintes sont définies ci-dessous. Pour une
--- base existante, appliquer les ajustements de schéma nécessaires avant usage.
+-- CLM - Création initiale du schéma dans une base PostgreSQL vide.
+-- Créer et sélectionner la base cible avant d'exécuter ce script.
+-- Le script crée les tables, contraintes, index et données de référence.
+-- Il insère les comptes utilisateurs par défaut, mais pas de données métier
+-- (contrats, validations, documents, etc.).
+-- Ne pas l'exécuter sur une base contenant déjà ces tables.
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 SET search_path TO public;
-
-DROP TABLE IF EXISTS demandes_reinitialisation_mot_de_passe, journaux_audit, notifications, versions_contrat, avenants,
-    validations, regles_validation, documents_contrat, parties_contrat,
-    contrats, types_contrat, parametres_alertes, utilisateurs CASCADE;
 
 -- ---------------------------------------------------------------------
 -- UTILISATEURS
@@ -36,15 +30,15 @@ CREATE TABLE utilisateurs (
     utilisateurs_date_creation  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
--- Demandes de réinitialisation du mot de passe (migration intégrée).
-CREATE TABLE IF NOT EXISTS demandes_reinitialisation_mot_de_passe (
+-- Demandes de réinitialisation du mot de passe.
+CREATE TABLE demandes_reinitialisation_mot_de_passe (
     demande_id BIGSERIAL PRIMARY KEY,
     utilisateur_id INTEGER NOT NULL REFERENCES utilisateurs(utilisateurs_id) ON DELETE CASCADE,
     statut VARCHAR(20) NOT NULL DEFAULT 'EN_ATTENTE'
         CHECK (statut IN ('EN_ATTENTE', 'APPROUVEE', 'REJETEE')),
     date_creation TIMESTAMP NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_demandes_reinitialisation_statut_date
+CREATE INDEX idx_demandes_reinitialisation_statut_date
     ON demandes_reinitialisation_mot_de_passe (statut, date_creation);
 
 -- ---------------------------------------------------------------------
@@ -148,6 +142,8 @@ CREATE TABLE regles_validation (
     regles_validation_role_requis      VARCHAR(30)   NOT NULL
                       CHECK (regles_validation_role_requis IN ('VALIDEUR', 'JURIDIQUE', 'VALIDEUR_ET_JURIDIQUE')),
     regles_validation_valideur_id      INTEGER       REFERENCES utilisateurs(utilisateurs_id) ON DELETE SET NULL,
+    regles_validation_statut           VARCHAR(30)   NOT NULL DEFAULT 'ACTIVE'
+                      CHECK (regles_validation_statut IN ('EN_ATTENTE_SEUIL', 'EN_ATTENTE_CONFIRMATION', 'ACTIVE')),
     CONSTRAINT chk_montants CHECK (regles_validation_montant_maximum IS NULL OR regles_validation_montant_maximum > regles_validation_montant_minimum)
 );
 
@@ -227,6 +223,7 @@ CREATE TABLE notifications (
     notifications_id                  BIGSERIAL PRIMARY KEY,
     notifications_utilisateur_id      INTEGER       NOT NULL REFERENCES utilisateurs(utilisateurs_id) ON DELETE CASCADE,
     notifications_contrat_id          INTEGER       REFERENCES contrats(contrats_id) ON DELETE CASCADE,
+    notifications_regle_validation_id BIGINT        REFERENCES regles_validation(regles_validation_id) ON DELETE SET NULL,
     notifications_parametre_alerte_id BIGINT        REFERENCES parametres_alertes(parametres_alertes_id) ON DELETE SET NULL,
     notifications_titre               VARCHAR(150)  NOT NULL,
     notifications_message             VARCHAR(500)  NOT NULL,

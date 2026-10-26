@@ -53,7 +53,14 @@ public class ValidationsService {
                 .map(previous -> previous.getCycle() + 1)
                 .orElse(1);
         List<com.suivicontrats.front.entity.ReglesValidation> circuit = reglesValidationService.getCircuit(contract.getTypeId(), contract.getMontant());
-        if (circuit.isEmpty()) throw new IllegalArgumentException("Aucune règle de validation ne couvre le type et le montant de ce contrat.");
+        if (circuit.isEmpty()) {
+            String message = "Aucune règle active ne couvre le type et le montant du contrat "
+                + contract.getReference() + " (" + contract.getMontant().toPlainString() + " "
+                + contract.getDevise() + "). Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
+            notificationsService.notifyMissingRuleForContract(contratId,
+                "Aucune règle de validation applicable", message);
+            throw new IllegalArgumentException("Aucune règle de validation ne couvre le type et le montant de ce contrat.");
+        }
         List<Validations> steps = new java.util.ArrayList<>();
         Integer firstLevel = circuit.stream().map(com.suivicontrats.front.entity.ReglesValidation::getNiveau)
                 .min(Integer::compareTo).orElseThrow();

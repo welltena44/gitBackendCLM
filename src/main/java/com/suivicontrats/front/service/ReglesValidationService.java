@@ -1,7 +1,9 @@
 package com.suivicontrats.front.service;
 
 import com.suivicontrats.front.entity.ReglesValidation;
+import com.suivicontrats.front.entity.Contrat;
 import com.suivicontrats.front.repository.ReglesValidationRepository;
+import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.UtilisateursRepository;
 import com.suivicontrats.front.entity.Utilisateurs;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -17,7 +20,9 @@ import java.util.List;
 public class ReglesValidationService {
 
     private final ReglesValidationRepository repo;
+    private final ContratRepository contratRepo;
     private final UtilisateursRepository utilisateursRepo;
+    private final NotificationsService notificationsService;
 
     public List<ReglesValidation> getAll(){ return repo.findAllByOrderByNiveauAsc(); }
 
@@ -27,56 +32,82 @@ public class ReglesValidationService {
     
     public List<ReglesValidation> getByType(Long typeId){ return repo.findByTypeContratIdOrderByNiveauAsc(typeId); }
 
+    @Transactional
     public ReglesValidation create(ReglesValidation r){
-        Authentication auth = requireAdminOrJuridique();
-        if (hasRole(auth, "ADMIN")) {
-            // L'Admin choisit le type et le circuit; le seuil financier vient du Juridique.
-            if (r.getRegleSourceId() == null)
-                throw new IllegalArgumentException("Sélectionnez un seuil juridique auquel rattacher cette étape.");
-            if (r.getTypeContratId() == null)
-                throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
-            ReglesValidation source = getOne(r.getRegleSourceId());
-            r.setMontantMinimum(source.getMontantMinimum());
-            r.setMontantMaximum(source.getMontantMaximum());
-        } else {
-            // Le Juridique définit les seuils financiers globaux; le type relève du circuit Admin.
-            r.setTypeContratId(null);
-            r.setNiveau(1);
-            r.setRoleRequis("VALIDEUR");
-            r.setValideurId(null);
-        }
-        validate(r);
-        ensureUniqueLevel(r, null);
+        requireAdmin();
+        if (r.getTypeContratId() == null)
+            throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
+        validateWorkflow(r);
         r.setId(null);
-        return repo.save(r);
+        r.setMontantMinimum(BigDecimal.ZERO);
+        r.setMontantMaximum(null);
+        r.setStatut("EN_ATTENTE_SEUIL");
+        ReglesValidation saved = repo.save(r);
+        notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
+                saved.getId(), "Circuit de validation à compléter",
+                "L’ADMIN a créé une règle de niveau " + saved.getNiveau() + ". Définissez son seuil financier.");
+        return saved;
     }
 
+    @Transactional
     public ReglesValidation update(Long id, ReglesValidation r){
         Authentication auth = requireAdminOrJuridique();
         ReglesValidation existing = getOne(id);
         if (hasRole(auth, "JURIDIQUE")) {
             validateThresholds(r);
-            existing.setTypeContratId(r.getTypeContratId());
             existing.setMontantMinimum(r.getMontantMinimum());
             existing.setMontantMaximum(r.getMontantMaximum());
+            existing.setStatut("EN_ATTENTE_CONFIRMATION");
+            ReglesValidation saved = repo.save(existing);
+            notificationsService.notifyRuleRole(Utilisateurs.Role.ADMIN,
+                    saved.getId(), "Seuil de validation à confirmer",
+                    "Le Juridique a défini le seuil de la règle de niveau " + saved.getNiveau() + ". Confirmez son activation.");
+            return saved;
         } else {
             validateWorkflow(r);
             if (r.getTypeContratId() == null)
                 throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
-            r.setMontantMinimum(existing.getMontantMinimum());
-            r.setMontantMaximum(existing.getMontantMaximum());
-            ensureUniqueLevel(r, id);
             existing.setTypeContratId(r.getTypeContratId());
             existing.setNiveau(r.getNiveau());
             existing.setRoleRequis(r.getRoleRequis());
             existing.setValideurId(r.getValideurId());
+            existing.setMontantMinimum(BigDecimal.ZERO);
+            existing.setMontantMaximum(null);
+            existing.setStatut("EN_ATTENTE_SEUIL");
+            ReglesValidation saved = repo.save(existing);
+            notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
+                    saved.getId(), "Circuit de validation modifié",
+                    "L’ADMIN a modifié une règle de niveau " + saved.getNiveau() + ". Vérifiez et redéfinissez son seuil.");
+            return saved;
         }
-        return repo.save(existing);
     }
 
-    private void validate(ReglesValidation r) {
-        validateThresholds(r);
-        validateWorkflow(r);
+    @Transactional
+    public ReglesValidation confirm(Long id) {
+        requireAdmin();
+        ReglesValidation rule = getOne(id);
+        if (!"EN_ATTENTE_CONFIRMATION".equals(rule.getStatut()))
+            throw new IllegalStateException("Seule une règle dont le seuil est défini peut être confirmée.");
+        validateThresholds(rule);
+        ensureUniqueLevel(rule, id);
+        List<Contrat> previouslyUnmatched = contratRepo.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE")).stream()
+            .filter(contract -> rule.getTypeContratId() == null
+                || java.util.Objects.equals(contract.getTypeId(), rule.getTypeContratId()))
+            .filter(contract -> getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+            .toList();
+        rule.setStatut("ACTIVE");
+        ReglesValidation saved = repo.save(rule);
+        previouslyUnmatched.stream()
+            .filter(contract -> !getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+            .forEach(contract -> notificationsService.notifyUser(contract.getResponsableId(), contract.getId(),
+                "Seuil de validation disponible",
+                "Le seuil de validation du contrat " + contract.getReference()
+                    + " est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
+                "INFO"));
+        notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
+                saved.getId(), "Règle de validation activée",
+                "L’ADMIN a confirmé et activé la règle de niveau " + saved.getNiveau() + ".");
+        return saved;
     }
 
     private void validateThresholds(ReglesValidation r) {
@@ -104,6 +135,7 @@ public class ReglesValidationService {
     private void ensureUniqueLevel(ReglesValidation candidate, Long excludedId) {
         boolean duplicate = repo.findAll().stream()
                 .filter(existing -> excludedId == null || !excludedId.equals(existing.getId()))
+                .filter(existing -> "ACTIVE".equals(existing.getStatut()) || "EN_ATTENTE_CONFIRMATION".equals(existing.getStatut()))
                 .anyMatch(existing -> java.util.Objects.equals(existing.getTypeContratId(), candidate.getTypeContratId())
                         && sameAmount(existing.getMontantMinimum(), candidate.getMontantMinimum())
                         && sameAmount(existing.getMontantMaximum(), candidate.getMontantMaximum())
@@ -133,6 +165,13 @@ public class ReglesValidationService {
             throw new AccessDeniedException("La suppression d'une étape de circuit est réservée à l'administrateur.");
         }
         repo.deleteById(id);
+    }
+
+    private Authentication requireAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !hasRole(auth, "ADMIN"))
+            throw new AccessDeniedException("La création et la confirmation des règles sont réservées à l’administrateur.");
+        return auth;
     }
 
     private Authentication requireAdminOrJuridique() {

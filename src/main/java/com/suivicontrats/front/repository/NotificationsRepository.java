@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface NotificationsRepository extends JpaRepository<Notifications, Long> {
     List<Notifications> findByUtilisateurIdAndLuOrderByDateCreationDesc(Integer utilisateurId, Boolean lu);
+    boolean existsByUtilisateurIdAndContratIdAndTitre(Integer utilisateurId, Integer contratId, String titre);
     List<Notifications> findByUtilisateurIdOrderByDateCreationDesc(Integer utilisateurId);
     long countByUtilisateurIdAndLuFalse(Integer utilisateurId);
     List<Notifications> findByContratId(Integer contratId);

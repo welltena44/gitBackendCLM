@@ -28,6 +28,9 @@ public class Notifications {
     @Column(name = "notifications_parametre_alerte_id")
     private Long parametreAlerteId;
 
+    @Column(name = "notifications_regle_validation_id")
+    private Long regleValidationId;
+
     @Column(name = "notifications_titre", nullable = false, length = 150)
     private String titre;
 

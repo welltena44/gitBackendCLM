@@ -45,7 +45,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/demande-acces",
-                                "/api/auth/password-reset-requests").permitAll()
+                            "/api/auth/password-reset-requests", "/api/auth/session-end").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/journaux-audit/**", "/api/parametres-alertes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/types-contrat/**").authenticated()

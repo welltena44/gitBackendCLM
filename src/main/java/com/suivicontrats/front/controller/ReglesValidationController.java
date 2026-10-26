@@ -39,6 +39,9 @@ public class ReglesValidationController {
     @PutMapping("/{id}")
     public ReglesValidation update(@PathVariable Long id, @RequestBody ReglesValidation r){ return service.update(id, r); }
 
+    @PostMapping("/{id}/confirmer")
+    public ReglesValidation confirm(@PathVariable Long id){ return service.confirm(id); }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id){ service.delete(id); }
 }
