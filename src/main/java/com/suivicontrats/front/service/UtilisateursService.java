@@ -31,8 +31,7 @@ public class UtilisateursService {
     @Transactional(readOnly = true)
     public Utilisateurs getOne(Integer id) {
         return repository.findById(id)
-                .orElseThrow(() ->
-                        new RuntimeException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
     }
 
     @Transactional
@@ -52,11 +51,10 @@ public class UtilisateursService {
         Utilisateurs savedUser = repository.save(utilisateur);
 
         emailService.envoyerEmailCreationCompte(
-            savedUser.getEmail(),
-            nomComplet(savedUser),
-            String.valueOf(savedUser.getMatricule()),
-            motDePasseClair
-        );
+                savedUser.getEmail(),
+                nomComplet(savedUser),
+                String.valueOf(savedUser.getMatricule()),
+                motDePasseClair);
 
         return savedUser;
     }
@@ -78,15 +76,13 @@ public class UtilisateursService {
 
         if (!email.equalsIgnoreCase(ancienneAdresse)) {
             emailService.envoyerEmailModificationAdresse(
-                ancienneAdresse,
-                email,
-                nomComplet(saved)
-            );
+                    ancienneAdresse,
+                    email,
+                    nomComplet(saved));
         } else {
             emailService.envoyerEmailModificationCompte(
-                email,
-                nomComplet(saved)
-            );
+                    email,
+                    nomComplet(saved));
         }
 
         return UtilisateursDTO.builder()
@@ -143,14 +139,12 @@ public class UtilisateursService {
 
             // Accepter un nouveau mot de passe en clair,
             // mais ne jamais remplacer le hash par un hash reçu.
-            boolean estDejaUnHash =
-                    nouveauMotDePasse.startsWith("$2a$")
+            boolean estDejaUnHash = nouveauMotDePasse.startsWith("$2a$")
                     || nouveauMotDePasse.startsWith("$2b$")
                     || nouveauMotDePasse.startsWith("$2y$");
 
             if (!estDejaUnHash) {
-                motDePasseModifie =
-                        ancienHash == null
+                motDePasseModifie = ancienHash == null
                         || !passwordEncoder.matches(
                                 nouveauMotDePasse, ancienHash);
 
@@ -169,23 +163,20 @@ public class UtilisateursService {
             emailService.envoyerEmailModificationAdresse(
                     ancienneAdresse,
                     savedUser.getEmail(),
-                    nomComplet(savedUser)
-            );
+                    nomComplet(savedUser));
         }
 
         if (motDePasseModifie) {
             emailService.envoyerEmailModificationMotDePasse(
                     savedUser.getEmail(),
                     nomComplet(savedUser),
-                    nouveauMotDePasse
-            );
+                    nouveauMotDePasse);
         }
 
         if (!adresseModifiee && !motDePasseModifie) {
             emailService.envoyerEmailModificationCompte(
                     savedUser.getEmail(),
-                    nomComplet(savedUser)
-            );
+                    nomComplet(savedUser));
         }
 
         return savedUser;
@@ -207,7 +198,8 @@ public class UtilisateursService {
 
     private String genererMotDePasse() {
         StringBuilder value = new StringBuilder(8);
-        for (int i = 0; i < 8; i++) value.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
+        for (int i = 0; i < 8; i++)
+            value.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
         return value.toString();
     }
 
@@ -236,9 +228,8 @@ public class UtilisateursService {
         Utilisateurs utilisateur = getOne(id);
 
         emailService.envoyerEmailSuppressionCompte(
-            utilisateur.getEmail(),
-            nomComplet(utilisateur)
-        );
+                utilisateur.getEmail(),
+                nomComplet(utilisateur));
 
         repository.delete(utilisateur);
     }

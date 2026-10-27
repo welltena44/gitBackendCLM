@@ -103,8 +103,8 @@ class ReglesValidationServiceTest {
                 "L’ADMIN a confirmé et activé la règle de niveau 1.");
     }
 
-        @Test
-        void adminActivationNotifiesManagerOfPreviouslyUnmatchedContract() {
+    @Test
+    void adminActivationNotifiesManagerOfPreviouslyUnmatchedContract() {
         authenticate("ADMIN");
         ReglesValidation existing = rule(15L, "EN_ATTENTE_CONFIRMATION");
         existing.setMontantMinimum(new BigDecimal("50000000"));
@@ -118,14 +118,14 @@ class ReglesValidationServiceTest {
         when(repository.save(any(ReglesValidation.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE"))).thenReturn(List.of(contract));
         when(repository.findCircuitApplicable(eq(15L), eq(contract.getMontant())))
-            .thenReturn(List.of(), List.of(existing));
+                .thenReturn(List.of(), List.of(existing));
 
         service.confirm(15L);
 
         verify(notificationsService).notifyUser(22, 9, "Seuil de validation disponible",
-            "Le seuil de validation du contrat CON-09 est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
-            "INFO");
-        }
+                "Le seuil de validation du contrat CON-09 est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
+                "INFO");
+    }
 
     @Test
     void legalCannotCreateWorkflow() {

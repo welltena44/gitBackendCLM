@@ -18,7 +18,8 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 @EnableMethodSecurity
 public class SecurityConfig {
     @Bean
-    public FilterRegistrationBean<JwtAuthenticationFilter> disableContainerRegistration(JwtAuthenticationFilter filter) {
+    public FilterRegistrationBean<JwtAuthenticationFilter> disableContainerRegistration(
+            JwtAuthenticationFilter filter) {
         FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;
@@ -27,7 +28,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtFilter) throws Exception {
         http.csrf(csrf -> csrf.disable())
-                .cors(cors -> {})
+                .cors(cors -> {
+                })
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
@@ -35,17 +37,20 @@ public class SecurityConfig {
                         .authenticationEntryPoint((request, response, exception) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
-                            response.getWriter().write("{\"message\":\"Authentification requise ou session expirée.\"}");
+                            response.getWriter()
+                                    .write("{\"message\":\"Authentification requise ou session expirée.\"}");
                         })
                         .accessDeniedHandler((request, response, exception) -> {
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                             response.setContentType("application/json");
-                            response.getWriter().write("{\"message\":\"Vous n'avez pas les droits nécessaires pour cette opération.\"}");
+                            response.getWriter().write(
+                                    "{\"message\":\"Vous n'avez pas les droits nécessaires pour cette opération.\"}");
                         }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/demande-acces",
-                            "/api/auth/password-reset-requests", "/api/auth/session-end").permitAll()
+                                "/api/auth/password-reset-requests", "/api/auth/session-end")
+                        .permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/journaux-audit/**", "/api/parametres-alertes/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/types-contrat/**").authenticated()

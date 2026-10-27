@@ -1,4 +1,5 @@
 package com.suivicontrats.front.dto;
+
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;

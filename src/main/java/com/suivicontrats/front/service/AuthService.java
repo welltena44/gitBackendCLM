@@ -19,6 +19,7 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtService jwtService;
     private final JournauxAuditService auditService;
+
     public LoginResponse login(LoginRequest req) {
 
         // Recherche par matricule
@@ -36,35 +37,33 @@ public class AuthService {
         }
 
         Utilisateurs u = repo.findByMatricule(matriculeSaisi)
-            .orElseThrow(() ->
-                new RuntimeException("Matricule non trouvé : " + matricule)
-            );
+                .orElseThrow(() -> new RuntimeException("Matricule non trouvé : " + matricule));
 
         if (!Boolean.TRUE.equals(u.getActif())) {
             throw new RuntimeException("Compte désactivé");
         }
 
         if (req.getMotDePasse() == null ||
-            !encoder.matches(req.getMotDePasse(), u.getMotDePasse())) {
+                !encoder.matches(req.getMotDePasse(), u.getMotDePasse())) {
             throw new RuntimeException("Mot de passe incorrect");
         }
 
         // Trace la connexion réussie dans le journal d'audit.
         auditService.record(u.getId(), null, null, "CONNEXION", null,
-            "Connexion réussie pour le matricule " + u.getMatricule());
+                "Connexion réussie pour le matricule " + u.getMatricule());
 
         return LoginResponse.builder()
-            .id(u.getId())
-            .matricule(u.getMatricule())
-            .nom(u.getNom())
-            .prenom(u.getPrenom())
-            .email(u.getEmail())
-            .role(u.getRole().name())
-            .service(u.getService())
-            .actif(u.getActif())
-            .changementMotDePasseRequis(u.getChangementMotDePasseRequis())
-            .token(jwtService.issue(u.getId()))
-            .message("Connexion réussie")
-            .build();
+                .id(u.getId())
+                .matricule(u.getMatricule())
+                .nom(u.getNom())
+                .prenom(u.getPrenom())
+                .email(u.getEmail())
+                .role(u.getRole().name())
+                .service(u.getService())
+                .actif(u.getActif())
+                .changementMotDePasseRequis(u.getChangementMotDePasseRequis())
+                .token(jwtService.issue(u.getId()))
+                .message("Connexion réussie")
+                .build();
     }
 }

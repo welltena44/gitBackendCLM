@@ -24,24 +24,39 @@ public class EcheancesScheduler {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Indian/Antananarivo"));
         List<ParametresAlertes> rules = alertes.findByActifTrueOrderByJoursAvantAsc();
         for (Contrat contract : contrats.findAll()) {
-            if (contract.getDateFin() == null) continue;
-            if ("SIGNE".equals(contract.getStatut()) && contract.getDateDebut() != null && !contract.getDateDebut().isAfter(today)) {
-                String old = contract.getStatut(); contract.setStatut("ACTIF"); contrats.save(contract);
-                audit.record(null, contract.getId(), contract.getReference(), "CONTRAT_ACTIF", "statut=" + old, "statut=ACTIF");
+            if (contract.getDateFin() == null)
+                continue;
+            if ("SIGNE".equals(contract.getStatut()) && contract.getDateDebut() != null
+                    && !contract.getDateDebut().isAfter(today)) {
+                String old = contract.getStatut();
+                contract.setStatut("ACTIF");
+                contrats.save(contract);
+                audit.record(null, contract.getId(), contract.getReference(), "CONTRAT_ACTIF", "statut=" + old,
+                        "statut=ACTIF");
             }
-            if (("SIGNE".equals(contract.getStatut()) || "ACTIF".equals(contract.getStatut())) && contract.getDateFin().isBefore(today)) {
-                String old = contract.getStatut(); contract.setStatut("EXPIRE"); contrats.save(contract);
-                audit.record(null, contract.getId(), contract.getReference(), "CONTRAT_EXPIRE", "statut=" + old, "statut=EXPIRE");
+            if (("SIGNE".equals(contract.getStatut()) || "ACTIF".equals(contract.getStatut()))
+                    && contract.getDateFin().isBefore(today)) {
+                String old = contract.getStatut();
+                contract.setStatut("EXPIRE");
+                contrats.save(contract);
+                audit.record(null, contract.getId(), contract.getReference(), "CONTRAT_EXPIRE", "statut=" + old,
+                        "statut=EXPIRE");
                 continue;
             }
-            if (contract.getResponsableId() == null || !List.of("SIGNE", "ACTIF", "APPROUVE").contains(contract.getStatut())) continue;
+            if (contract.getResponsableId() == null
+                    || !List.of("SIGNE", "ACTIF", "APPROUVE").contains(contract.getStatut()))
+                continue;
             long days = java.time.temporal.ChronoUnit.DAYS.between(today, contract.getDateFin());
             for (ParametresAlertes rule : rules) {
-                if (days < 0 || days > rule.getJoursAvant()) continue;
-                String nature = Boolean.TRUE.equals(contract.getRenouvellementAutomatique()) ? "renouvellement" : "fin / résiliation";
+                if (days < 0 || days > rule.getJoursAvant())
+                    continue;
+                String nature = Boolean.TRUE.equals(contract.getRenouvellementAutomatique()) ? "renouvellement"
+                        : "fin / résiliation";
                 notifications.notifyDeadline(contract.getResponsableId(), contract.getId(), rule.getId(),
                         "Échéance contractuelle dans " + days + " jours",
-                        "Le contrat " + contract.getReference() + " arrive à échéance le " + contract.getDateFin() + ". Vérifiez le " + nature + " et le préavis de " + contract.getJoursPreavis() + " jour(s).");
+                        "Le contrat " + contract.getReference() + " arrive à échéance le " + contract.getDateFin()
+                                + ". Vérifiez le " + nature + " et le préavis de " + contract.getJoursPreavis()
+                                + " jour(s).");
             }
         }
     }

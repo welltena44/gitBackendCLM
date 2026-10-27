@@ -9,11 +9,18 @@ import java.util.List;
 
 public interface NotificationsRepository extends JpaRepository<Notifications, Long> {
     List<Notifications> findByUtilisateurIdAndLuOrderByDateCreationDesc(Integer utilisateurId, Boolean lu);
+
     boolean existsByUtilisateurIdAndContratIdAndTitre(Integer utilisateurId, Integer contratId, String titre);
+
     List<Notifications> findByUtilisateurIdOrderByDateCreationDesc(Integer utilisateurId);
+
     long countByUtilisateurIdAndLuFalse(Integer utilisateurId);
+
     List<Notifications> findByContratId(Integer contratId);
-    boolean existsByUtilisateurIdAndContratIdAndParametreAlerteId(Integer utilisateurId, Integer contratId, Long parametreAlerteId);
+
+    boolean existsByUtilisateurIdAndContratIdAndParametreAlerteId(Integer utilisateurId, Integer contratId,
+            Long parametreAlerteId);
+
     @Modifying
     @Query("update Notifications n set n.lu = true where n.utilisateurId = :userId and n.lu = false")
     int markAllRead(@Param("userId") Integer userId);

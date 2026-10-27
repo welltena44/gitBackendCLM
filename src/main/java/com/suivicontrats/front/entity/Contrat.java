@@ -89,64 +89,166 @@ public class Contrat {
         dateModification = LocalDateTime.now();
     }
 
-    public Contrat() {}
+    public Contrat() {
+    }
 
-    public String getReference() { return reference; }
-    public void setReference(String reference) { this.reference = reference; }
-    public Integer getId() { return id; }
-    public void setId(Integer id) { this.id = id; }
+    public String getReference() {
+        return reference;
+    }
 
-    public String getObjet() { return objet; }
-    public void setObjet(String objet) { this.objet = objet; }
+    public void setReference(String reference) {
+        this.reference = reference;
+    }
 
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
+    public Integer getId() {
+        return id;
+    }
 
-    public String getClauses() { return clauses; }
-    public void setClauses(String clauses) { this.clauses = clauses; }
+    public void setId(Integer id) {
+        this.id = id;
+    }
 
-    public BigDecimal getMontant() { return montant; }
-    public void setMontant(BigDecimal montant) { this.montant = montant; }
+    public String getObjet() {
+        return objet;
+    }
 
-    public String getDevise() { return devise; }
-    public void setDevise(String devise) { this.devise = devise; }
+    public void setObjet(String objet) {
+        this.objet = objet;
+    }
 
-    public LocalDate getDateSignature() { return dateSignature; }
-    public void setDateSignature(LocalDate dateSignature) { this.dateSignature = dateSignature; }
+    public String getDescription() {
+        return description;
+    }
 
-    public LocalDate getDateDebut() { return dateDebut; }
-    public void setDateDebut(LocalDate dateDebut) { this.dateDebut = dateDebut; }
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
-    public LocalDate getDateFin() { return dateFin; }
-    public void setDateFin(LocalDate dateFin) { this.dateFin = dateFin; }
+    public String getClauses() {
+        return clauses;
+    }
 
-    public String getStatut() { return statut; }
-    public void setStatut(String statut) { this.statut = statut; }
+    public void setClauses(String clauses) {
+        this.clauses = clauses;
+    }
 
-    public String getService() { return service; }
-    public void setService(String service) { this.service = service; }
+    public BigDecimal getMontant() {
+        return montant;
+    }
 
-    public Integer getResponsableId() { return responsableId; }
-    public void setResponsableId(Integer responsableId) { this.responsableId = responsableId; }
+    public void setMontant(BigDecimal montant) {
+        this.montant = montant;
+    }
 
-    public Long getTypeId() { return typeId; }
-    public void setTypeId(Long typeId) { this.typeId = typeId; }
+    public String getDevise() {
+        return devise;
+    }
 
-    public Integer getDureeMois() { return dureeMois; }
-    public void setDureeMois(Integer dureeMois) { this.dureeMois = dureeMois; }
+    public void setDevise(String devise) {
+        this.devise = devise;
+    }
 
-    public Boolean getRenouvellementAutomatique() { return renouvellementAutomatique; }
-    public void setRenouvellementAutomatique(Boolean renouvellementAutomatique) { this.renouvellementAutomatique = renouvellementAutomatique; }
+    public LocalDate getDateSignature() {
+        return dateSignature;
+    }
 
-    public Integer getJoursPreavis() { return joursPreavis; }
-    public void setJoursPreavis(Integer joursPreavis) { this.joursPreavis = joursPreavis; }
+    public void setDateSignature(LocalDate dateSignature) {
+        this.dateSignature = dateSignature;
+    }
 
-    public Integer getCreePar() { return creePar; }
-    public void setCreePar(Integer creePar) { this.creePar = creePar; }
+    public LocalDate getDateDebut() {
+        return dateDebut;
+    }
 
-    public LocalDateTime getDateCreation() { return dateCreation; }
-    public void setDateCreation(LocalDateTime dateCreation) { this.dateCreation = dateCreation; }
+    public void setDateDebut(LocalDate dateDebut) {
+        this.dateDebut = dateDebut;
+    }
 
-    public LocalDateTime getDateModification() { return dateModification; }
-    public void setDateModification(LocalDateTime dateModification) { this.dateModification = dateModification; }
+    public LocalDate getDateFin() {
+        return dateFin;
+    }
+
+    public void setDateFin(LocalDate dateFin) {
+        this.dateFin = dateFin;
+    }
+
+    public String getStatut() {
+        return statut;
+    }
+
+    public void setStatut(String statut) {
+        this.statut = statut;
+    }
+
+    public String getService() {
+        return service;
+    }
+
+    public void setService(String service) {
+        this.service = service;
+    }
+
+    public Integer getResponsableId() {
+        return responsableId;
+    }
+
+    public void setResponsableId(Integer responsableId) {
+        this.responsableId = responsableId;
+    }
+
+    public Long getTypeId() {
+        return typeId;
+    }
+
+    public void setTypeId(Long typeId) {
+        this.typeId = typeId;
+    }
+
+    public Integer getDureeMois() {
+        return dureeMois;
+    }
+
+    public void setDureeMois(Integer dureeMois) {
+        this.dureeMois = dureeMois;
+    }
+
+    public Boolean getRenouvellementAutomatique() {
+        return renouvellementAutomatique;
+    }
+
+    public void setRenouvellementAutomatique(Boolean renouvellementAutomatique) {
+        this.renouvellementAutomatique = renouvellementAutomatique;
+    }
+
+    public Integer getJoursPreavis() {
+        return joursPreavis;
+    }
+
+    public void setJoursPreavis(Integer joursPreavis) {
+        this.joursPreavis = joursPreavis;
+    }
+
+    public Integer getCreePar() {
+        return creePar;
+    }
+
+    public void setCreePar(Integer creePar) {
+        this.creePar = creePar;
+    }
+
+    public LocalDateTime getDateCreation() {
+        return dateCreation;
+    }
+
+    public void setDateCreation(LocalDateTime dateCreation) {
+        this.dateCreation = dateCreation;
+    }
+
+    public LocalDateTime getDateModification() {
+        return dateModification;
+    }
+
+    public void setDateModification(LocalDateTime dateModification) {
+        this.dateModification = dateModification;
+    }
 }

@@ -8,9 +8,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "parties_contrat", indexes = @Index(
-        name = "idx_parties_contrat_id",
-        columnList = "parties_contrat_contrat_id"))
+@Table(name = "parties_contrat", indexes = @Index(name = "idx_parties_contrat_id", columnList = "parties_contrat_contrat_id"))
 public class PartiesContrat {
 
     @Id

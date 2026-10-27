@@ -15,7 +15,8 @@ import java.util.Map;
 public class ApiExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex) {
-        return response(HttpStatus.FORBIDDEN, safeMessage(ex.getMessage(), "Vous n'avez pas les droits nécessaires pour cette opération."));
+        return response(HttpStatus.FORBIDDEN,
+                safeMessage(ex.getMessage(), "Vous n'avez pas les droits nécessaires pour cette opération."));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -35,15 +36,16 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, Object>> mail(MailException ex) {
         return response(
                 HttpStatus.SERVICE_UNAVAILABLE,
-                safeMessage(ex.getMessage(), "Le courriel de notification n'a pas pu être envoyé.")
-        );
+                safeMessage(ex.getMessage(), "Le courriel de notification n'a pas pu être envoyé."));
     }
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> runtime(RuntimeException ex) {
         String message = safeMessage(ex.getMessage(), "Une erreur est survenue.");
-        HttpStatus status = message.toLowerCase().contains("non trouvé") || message.toLowerCase().contains("non trouvée")
-                ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+        HttpStatus status = message.toLowerCase().contains("non trouvé")
+                || message.toLowerCase().contains("non trouvée")
+                        ? HttpStatus.NOT_FOUND
+                        : HttpStatus.BAD_REQUEST;
         return response(status, message);
     }
 

@@ -19,21 +19,44 @@ public class NotificationsService {
     private final NotificationsRepository repo;
     private final UtilisateursRepository utilisateursRepo;
 
-    public List<Notifications> all(){ requireAdmin(); return repo.findAll(); }
-    public Notifications getOne(Long id){
+    public List<Notifications> all() {
+        requireAdmin();
+        return repo.findAll();
+    }
+
+    public Notifications getOne(Long id) {
         Notifications n = repo.findById(id).orElseThrow(() -> new RuntimeException("Notification non trouvée"));
-        if (!isAdmin() && !currentUserId().equals(n.getUtilisateurId())) throw new AccessDeniedException("Cette notification ne vous est pas destinée.");
+        if (!isAdmin() && !currentUserId().equals(n.getUtilisateurId()))
+            throw new AccessDeniedException("Cette notification ne vous est pas destinée.");
         return n;
     }
-    public List<Notifications> byUser(Integer userId){ requireSelfOrAdmin(userId); return repo.findByUtilisateurIdOrderByDateCreationDesc(userId); }
-    public List<Notifications> nonLues(Integer userId){ requireSelfOrAdmin(userId); return repo.findByUtilisateurIdAndLuOrderByDateCreationDesc(userId, false); }
-    public long countNonLues(Integer userId){ requireSelfOrAdmin(userId); return repo.countByUtilisateurIdAndLuFalse(userId); }
-    public Notifications save(Notifications n){ requireAdmin(); n.setId(null); return repo.save(n); }
+
+    public List<Notifications> byUser(Integer userId) {
+        requireSelfOrAdmin(userId);
+        return repo.findByUtilisateurIdOrderByDateCreationDesc(userId);
+    }
+
+    public List<Notifications> nonLues(Integer userId) {
+        requireSelfOrAdmin(userId);
+        return repo.findByUtilisateurIdAndLuOrderByDateCreationDesc(userId, false);
+    }
+
+    public long countNonLues(Integer userId) {
+        requireSelfOrAdmin(userId);
+        return repo.countByUtilisateurIdAndLuFalse(userId);
+    }
+
+    public Notifications save(Notifications n) {
+        requireAdmin();
+        n.setId(null);
+        return repo.save(n);
+    }
 
     /** Crée une notification métier pour un destinataire précis. */
     @Transactional
     public Notifications notifyUser(Integer userId, Integer contractId, String title, String message, String type) {
-        if (userId == null) return null;
+        if (userId == null)
+            return null;
         return saveForUser(userId, contractId, title, message, type);
     }
 
@@ -46,7 +69,8 @@ public class NotificationsService {
 
     @Transactional
     public void notifyRuleUsers(List<Utilisateurs> users, Long ruleId, String title, String message) {
-        if (users == null || users.isEmpty()) return;
+        if (users == null || users.isEmpty())
+            return;
         users.stream().map(Utilisateurs::getId).filter(java.util.Objects::nonNull).distinct()
                 .forEach(userId -> repo.save(Notifications.builder()
                         .utilisateurId(userId).regleValidationId(ruleId)
@@ -60,7 +84,8 @@ public class NotificationsService {
     }
 
     @Transactional
-    public void notifyContractRole(Utilisateurs.Role role, Integer contractId, String title, String message, String type) {
+    public void notifyContractRole(Utilisateurs.Role role, Integer contractId, String title, String message,
+            String type) {
         notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), contractId, title, message, type);
     }
 
@@ -77,17 +102,19 @@ public class NotificationsService {
     }
 
     private String truncate(String value, int maxLength) {
-        if (value == null) return "";
+        if (value == null)
+            return "";
         return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     public void notifyUsers(List<Utilisateurs> users, Integer contractId, String title, String message, String type) {
-        if (users == null || users.isEmpty()) return;
+        if (users == null || users.isEmpty())
+            return;
         users.stream().map(Utilisateurs::getId).filter(java.util.Objects::nonNull).distinct()
                 .forEach(id -> saveForUser(id, contractId, title, message, type));
     }
 
-    public Notifications update(Long id, Notifications details){
+    public Notifications update(Long id, Notifications details) {
         requireAdmin();
         Notifications notification = getOne(id);
         notification.setUtilisateurId(details.getUtilisateurId());
@@ -100,8 +127,8 @@ public class NotificationsService {
         notification.setLu(details.getLu());
         return repo.save(notification);
     }
-    
-    public Notifications marquerLu(Long id){
+
+    public Notifications marquerLu(Long id) {
         Notifications n = getOne(id);
         n.setLu(true);
         return repo.save(n);
@@ -115,11 +142,14 @@ public class NotificationsService {
 
     @Transactional
     public void notifyDeadline(Integer userId, Integer contractId, Long parameterId, String title, String message) {
-        if (userId != null) saveDeadlineForUser(userId, contractId, parameterId, title, message);
+        if (userId != null)
+            saveDeadlineForUser(userId, contractId, parameterId, title, message);
     }
 
-    private void saveDeadlineForUser(Integer userId, Integer contractId, Long parameterId, String title, String message) {
-        if (repo.existsByUtilisateurIdAndContratIdAndParametreAlerteId(userId, contractId, parameterId)) return;
+    private void saveDeadlineForUser(Integer userId, Integer contractId, Long parameterId, String title,
+            String message) {
+        if (repo.existsByUtilisateurIdAndContratIdAndParametreAlerteId(userId, contractId, parameterId))
+            return;
         try {
             repo.save(Notifications.builder().utilisateurId(userId).contratId(contractId)
                     .parametreAlerteId(parameterId).titre(truncate(title, 150)).message(truncate(message, 500))
@@ -129,14 +159,30 @@ public class NotificationsService {
         }
     }
 
-    public void delete(Long id){ getOne(id); repo.deleteById(id); }
+    public void delete(Long id) {
+        getOne(id);
+        repo.deleteById(id);
+    }
 
-    private Integer currentUserId(){
-        Authentication auth=SecurityContextHolder.getContext().getAuthentication();
-        if(auth==null||!(auth.getPrincipal() instanceof Integer id)) throw new AccessDeniedException("Authentification requise");
+    private Integer currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof Integer id))
+            throw new AccessDeniedException("Authentification requise");
         return id;
     }
-    private boolean isAdmin(){ Authentication auth=SecurityContextHolder.getContext().getAuthentication(); return auth!=null&&auth.getAuthorities().stream().anyMatch(a->a.getAuthority().equals("ROLE_ADMIN")); }
-    private void requireAdmin(){ if(!isAdmin()) throw new AccessDeniedException("Opération réservée à l'administrateur."); }
-    private void requireSelfOrAdmin(Integer userId){ if(!isAdmin()&&!currentUserId().equals(userId)) throw new AccessDeniedException("Accès réservé à votre compte."); }
+
+    private boolean isAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    private void requireAdmin() {
+        if (!isAdmin())
+            throw new AccessDeniedException("Opération réservée à l'administrateur.");
+    }
+
+    private void requireSelfOrAdmin(Integer userId) {
+        if (!isAdmin() && !currentUserId().equals(userId))
+            throw new AccessDeniedException("Accès réservé à votre compte.");
+    }
 }

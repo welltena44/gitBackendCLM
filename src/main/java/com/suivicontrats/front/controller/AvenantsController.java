@@ -14,24 +14,32 @@ public class AvenantsController {
     private final AvenantsService service;
 
     @GetMapping
-    public List<Avenants> all(){ return service.all(); }
+    public List<Avenants> all() {
+        return service.all();
+    }
 
     @GetMapping("/contrat/{contratId}")
-    public List<Avenants> byContrat(@PathVariable Integer contratId){
+    public List<Avenants> byContrat(@PathVariable Integer contratId) {
         return service.byContrat(contratId);
     }
 
     @GetMapping("/{id}")
-    public Avenants one(@PathVariable Long id){ return service.getOne(id); }
+    public Avenants one(@PathVariable Long id) {
+        return service.getOne(id);
+    }
 
     @PostMapping
-    public Avenants create(@RequestBody Avenants a){ return service.save(a); }
+    public Avenants create(@RequestBody Avenants a) {
+        return service.save(a);
+    }
 
     @PutMapping("/{id}")
-    public Avenants update(@PathVariable Long id, @RequestBody Avenants a){
+    public Avenants update(@PathVariable Long id, @RequestBody Avenants a) {
         return service.update(id, a);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id){ service.delete(id); }
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
+    }
 }

@@ -8,9 +8,8 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Entity
-@Table(name = "versions_contrat", uniqueConstraints = @UniqueConstraint(
-        name = "uq_version",
-        columnNames = {"versions_contrat_contrat_id", "versions_contrat_version"}))
+@Table(name = "versions_contrat", uniqueConstraints = @UniqueConstraint(name = "uq_version", columnNames = {
+        "versions_contrat_contrat_id", "versions_contrat_version" }))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

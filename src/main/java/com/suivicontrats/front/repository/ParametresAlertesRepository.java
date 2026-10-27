@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface ParametresAlertesRepository extends JpaRepository<ParametresAlertes, Long> {
     List<ParametresAlertes> findByActifTrueOrderByJoursAvantAsc();
+
     List<ParametresAlertes> findAllByOrderByJoursAvantAsc();
+
     java.util.Optional<ParametresAlertes> findByJoursAvant(Integer joursAvant);
 }

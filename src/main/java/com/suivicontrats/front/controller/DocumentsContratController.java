@@ -20,12 +20,12 @@ public class DocumentsContratController {
     private final DocumentsContratService service;
 
     @GetMapping("/documents")
-    public List<DocumentsContrat> all(){
+    public List<DocumentsContrat> all() {
         return service.getAll();
     }
 
     @GetMapping("/contrats/{contratId}/documents")
-    public List<DocumentsContrat> byContrat(@PathVariable Integer contratId){
+    public List<DocumentsContrat> byContrat(@PathVariable Integer contratId) {
         return service.getByContrat(contratId);
     }
 
@@ -34,18 +34,17 @@ public class DocumentsContratController {
             @PathVariable Integer contratId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "userId", required = false) Integer userId,
-            @RequestParam(value = "categorie", defaultValue = "JUSTIFICATIF") String categorie
-    ) throws IOException {
+            @RequestParam(value = "categorie", defaultValue = "JUSTIFICATIF") String categorie) throws IOException {
         return service.upload(contratId, file, userId, categorie);
     }
 
     @GetMapping("/documents/{id}")
-    public DocumentsContrat getInfo(@PathVariable Long id){
+    public DocumentsContrat getInfo(@PathVariable Long id) {
         return service.getById(id);
     }
 
     @PutMapping("/documents/{id}")
-    public DocumentsContrat update(@PathVariable Long id, @RequestBody DocumentsContrat document){
+    public DocumentsContrat update(@PathVariable Long id, @RequestBody DocumentsContrat document) {
         return service.update(id, document);
     }
 

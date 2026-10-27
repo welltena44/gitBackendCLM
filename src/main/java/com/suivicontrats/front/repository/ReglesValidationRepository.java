@@ -10,18 +10,17 @@ import java.util.List;
 public interface ReglesValidationRepository extends JpaRepository<ReglesValidation, Long> {
 
     List<ReglesValidation> findByTypeContratIdOrderByNiveauAsc(Long typeContratId);
-    
+
     List<ReglesValidation> findAllByOrderByNiveauAsc();
 
     // Ta logique métier : montant_minimum <= montant < montant_maximum
     @Query("SELECT r FROM ReglesValidation r WHERE " +
-           "(r.typeContratId = :typeId OR r.typeContratId IS NULL) AND " +
-           "r.montantMinimum <= :montant AND " +
-           "(r.montantMaximum IS NULL OR r.montantMaximum > :montant) " +
+            "(r.typeContratId = :typeId OR r.typeContratId IS NULL) AND " +
+            "r.montantMinimum <= :montant AND " +
+            "(r.montantMaximum IS NULL OR r.montantMaximum > :montant) " +
             "AND r.statut = 'ACTIVE' " +
-           "ORDER BY r.niveau ASC")
+            "ORDER BY r.niveau ASC")
     List<ReglesValidation> findCircuitApplicable(
             @Param("typeId") Long typeContratId,
-            @Param("montant") BigDecimal montant
-    );
+            @Param("montant") BigDecimal montant);
 }

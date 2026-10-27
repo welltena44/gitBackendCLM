@@ -14,22 +14,32 @@ public class ParametresAlertesController {
     private final ParametresAlertesService service;
 
     @GetMapping
-    public List<ParametresAlertes> all(){ return service.all(); }
+    public List<ParametresAlertes> all() {
+        return service.all();
+    }
 
     @GetMapping("/{id}")
-    public ParametresAlertes one(@PathVariable Long id){ return service.getOne(id); }
+    public ParametresAlertes one(@PathVariable Long id) {
+        return service.getOne(id);
+    }
 
     @GetMapping("/actifs")
-    public List<ParametresAlertes> actifs(){ return service.actifs(); }
+    public List<ParametresAlertes> actifs() {
+        return service.actifs();
+    }
 
     @PostMapping
-    public ParametresAlertes create(@RequestBody ParametresAlertes p){ return service.create(p); }
+    public ParametresAlertes create(@RequestBody ParametresAlertes p) {
+        return service.create(p);
+    }
 
     @PutMapping("/{id}")
-    public ParametresAlertes update(@PathVariable Long id, @RequestBody ParametresAlertes p){
+    public ParametresAlertes update(@PathVariable Long id, @RequestBody ParametresAlertes p) {
         return service.update(id, p);
     }
 
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id){ service.delete(id); }
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
+    }
 }

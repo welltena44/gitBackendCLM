@@ -19,7 +19,8 @@ public class DemandesReinitialisationService {
 
     @Transactional
     public void soumettre(Integer matricule) {
-        if (matricule == null) return;
+        if (matricule == null)
+            return;
         utilisateursRepository.findByMatricule(matricule)
                 .filter(u -> Boolean.TRUE.equals(u.getActif()))
                 .ifPresent(u -> demandesRepository.findFirstByUtilisateur_IdAndStatut(
@@ -32,7 +33,7 @@ public class DemandesReinitialisationService {
     public List<DemandeReinitialisationDTO> enAttente(Integer adminId) {
         verifierAdministrateur(adminId);
         return demandesRepository.findByStatutOrderByDateCreationAsc(
-                        DemandesReinitialisationMotDePasse.Statut.EN_ATTENTE)
+                DemandesReinitialisationMotDePasse.Statut.EN_ATTENTE)
                 .stream()
                 .map(d -> new DemandeReinitialisationDTO(
                         d.getId(), d.getUtilisateur().getMatricule(),

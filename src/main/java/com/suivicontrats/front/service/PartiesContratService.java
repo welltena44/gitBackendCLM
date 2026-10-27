@@ -16,29 +16,32 @@ public class PartiesContratService {
     private final ContratService contratService;
     private final JournauxAuditService audit;
 
-    public List<PartiesContrat> getByContrat(Integer contratId){
+    public List<PartiesContrat> getByContrat(Integer contratId) {
         contratService.getById(contratId);
         return repo.findByContratId(contratId);
     }
 
-    public PartiesContrat getOne(Long id){
+    public PartiesContrat getOne(Long id) {
         PartiesContrat p = repo.findById(id).orElseThrow(() -> new RuntimeException("Partie non trouvée"));
         contratService.getById(p.getContratId());
         return p;
     }
 
-    public PartiesContrat create(PartiesContrat p){
-        if (!canManage()) throw new AccessDeniedException("Modification réservée au gestionnaire du contrat.");
+    public PartiesContrat create(PartiesContrat p) {
+        if (!canManage())
+            throw new AccessDeniedException("Modification réservée au gestionnaire du contrat.");
         var contract = contratService.getById(p.getContratId());
         p.setId(null);
         PartiesContrat saved = repo.save(p);
-        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_AJOUTEE", null, "nom=" + saved.getNom() + "; type=" + saved.getType());
+        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_AJOUTEE", null,
+                "nom=" + saved.getNom() + "; type=" + saved.getType());
         return saved;
     }
 
-    public PartiesContrat update(Long id, PartiesContrat details){
+    public PartiesContrat update(Long id, PartiesContrat details) {
         PartiesContrat p = getOne(id);
-        if (!canManage()) throw new AccessDeniedException("Modification réservée au gestionnaire du contrat.");
+        if (!canManage())
+            throw new AccessDeniedException("Modification réservée au gestionnaire du contrat.");
         String old = "nom=" + p.getNom() + "; type=" + p.getType();
         p.setNom(details.getNom());
         p.setType(details.getType());
@@ -46,19 +49,32 @@ public class PartiesContratService {
         p.setTelephone(details.getTelephone());
         PartiesContrat saved = repo.save(p);
         var contract = contratService.getById(saved.getContratId());
-        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_MODIFIEE", old, "nom=" + saved.getNom() + "; type=" + saved.getType());
+        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_MODIFIEE", old,
+                "nom=" + saved.getNom() + "; type=" + saved.getType());
         return saved;
     }
 
-    public void delete(Long id){ PartiesContrat p = getOne(id); if (!canManage()) throw new AccessDeniedException("Suppression réservée au gestionnaire du contrat."); var contract = contratService.getById(p.getContratId()); audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_SUPPRIMEE", "nom=" + p.getNom() + "; type=" + p.getType(), null); repo.deleteById(id); }
-    public List<PartiesContrat> getAll(){
+    public void delete(Long id) {
+        PartiesContrat p = getOne(id);
+        if (!canManage())
+            throw new AccessDeniedException("Suppression réservée au gestionnaire du contrat.");
+        var contract = contratService.getById(p.getContratId());
+        audit.record(currentUserId(), contract.getId(), contract.getReference(), "PARTIE_SUPPRIMEE",
+                "nom=" + p.getNom() + "; type=" + p.getType(), null);
+        repo.deleteById(id);
+    }
+
+    public List<PartiesContrat> getAll() {
         var allowed = contratService.getAll().stream().map(c -> c.getId()).collect(java.util.stream.Collectors.toSet());
         return repo.findAll().stream().filter(p -> allowed.contains(p.getContratId())).toList();
     }
-    private boolean canManage(){
+
+    private boolean canManage() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_GESTIONNAIRE"));
+        return auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_GESTIONNAIRE"));
     }
+
     private Integer currentUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return principal instanceof Integer id ? id : null;

@@ -17,28 +17,35 @@ public class ValidationsController {
     private final ValidationsService service;
 
     @GetMapping
-    public List<Validations> all(){ return service.all(); }
+    public List<Validations> all() {
+        return service.all();
+    }
 
     @GetMapping("/{id}")
-    public Validations one(@PathVariable Long id){ return service.getOne(id); }
+    public Validations one(@PathVariable Long id) {
+        return service.getOne(id);
+    }
 
     @GetMapping("/contrat/{contratId}")
-    public List<Validations> byContrat(@PathVariable Integer contratId){
+    public List<Validations> byContrat(@PathVariable Integer contratId) {
         return service.getByContrat(contratId);
     }
 
     @PostMapping("/contrat/{contratId}/generer")
     @PreAuthorize("hasAnyRole('ADMIN','GESTIONNAIRE')")
-    public List<Validations> generer(@PathVariable Integer contratId, @RequestParam(required = false) Integer demandeurId){
+    public List<Validations> generer(@PathVariable Integer contratId,
+            @RequestParam(required = false) Integer demandeurId) {
         return service.genererCircuit(contratId, demandeurId);
     }
 
     @PostMapping("/{id}/decider")
     @PreAuthorize("hasAnyRole('VALIDEUR','JURIDIQUE')")
-    public Validations decider(@PathVariable Long id, @RequestBody Map<String,Object> body, Authentication authentication){
+    public Validations decider(@PathVariable Long id, @RequestBody Map<String, Object> body,
+            Authentication authentication) {
         Integer valideurId = (Integer) authentication.getPrincipal();
         Object decisionValue = body.get("decision");
-        if (decisionValue == null) throw new IllegalArgumentException("La décision est obligatoire.");
+        if (decisionValue == null)
+            throw new IllegalArgumentException("La décision est obligatoire.");
         String decision = decisionValue.toString();
         Object commentaireValue = body.get("commentaire");
         String commentaire = commentaireValue == null ? "" : commentaireValue.toString();

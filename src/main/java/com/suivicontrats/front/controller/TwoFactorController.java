@@ -27,7 +27,8 @@ public class TwoFactorController {
     public ResponseEntity<?> generate2FA(@PathVariable String matricule, Authentication authentication) {
         Utilisateurs user = utilisateursRepository.findByMatricule(Integer.valueOf(matricule))
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-        if (!user.getId().equals(authentication.getPrincipal())) return ResponseEntity.status(403).body(Map.of("message", "Accès interdit."));
+        if (!user.getId().equals(authentication.getPrincipal()))
+            return ResponseEntity.status(403).body(Map.of("message", "Accès interdit."));
 
         GoogleAuthenticatorKey key = gAuth.createCredentials();
         String secret = key.getKey();
@@ -40,9 +41,8 @@ public class TwoFactorController {
         String qrCodeUrl = GoogleAuthenticatorQRGenerator.getOtpAuthTotpURL("SPAT-CLM", user.getEmail(), key);
 
         return ResponseEntity.ok(Map.of(
-            "secret", secret,
-            "qrCodeUrl", qrCodeUrl
-        ));
+                "secret", secret,
+                "qrCodeUrl", qrCodeUrl));
     }
 
     @PostMapping("/verify")
@@ -53,7 +53,8 @@ public class TwoFactorController {
 
         Utilisateurs user = utilisateursRepository.findByMatricule(Integer.valueOf(matricule))
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-        if (!user.getId().equals(authentication.getPrincipal())) return ResponseEntity.status(403).body(Map.of("success", false, "message", "Accès interdit."));
+        if (!user.getId().equals(authentication.getPrincipal()))
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "Accès interdit."));
 
         if (user.getSecret2fa() == null) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Aucun secret 2FA généré."));
@@ -66,7 +67,8 @@ public class TwoFactorController {
             utilisateursRepository.save(user);
             return ResponseEntity.ok(Map.of("success", true, "message", "2FA activé avec succès !"));
         } else {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Code de validation incorrect."));
+            return ResponseEntity.badRequest()
+                    .body(Map.of("success", false, "message", "Code de validation incorrect."));
         }
     }
 }

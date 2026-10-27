@@ -26,40 +26,49 @@ public class ValidationsService {
     private final JournauxAuditService journauxAuditService;
     private final ReglesValidationService reglesValidationService;
 
-    public List<Validations> getByContrat(Integer contratId){
+    public List<Validations> getByContrat(Integer contratId) {
         return all().stream().filter(v -> v.getContratId().equals(contratId)).toList();
     }
 
     public Validations getOne(Long id) {
-        Validations validation = validationsRepo.findById(id).orElseThrow(() -> new RuntimeException("Validation non trouvée"));
-        if (all().stream().noneMatch(v -> v.getId().equals(id))) throw new AccessDeniedException("Cette validation ne relève pas de votre périmètre.");
+        Validations validation = validationsRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Validation non trouvée"));
+        if (all().stream().noneMatch(v -> v.getId().equals(id)))
+            throw new AccessDeniedException("Cette validation ne relève pas de votre périmètre.");
         return validation;
     }
 
-    public List<Validations> getEnAttente(){ 
-        return validationsRepo.findByDecision("EN_ATTENTE"); 
+    public List<Validations> getEnAttente() {
+        return validationsRepo.findByDecision("EN_ATTENTE");
     }
 
     @Transactional
-    public List<Validations> genererCircuit(Integer contratId, Integer demandeurId){
+    public List<Validations> genererCircuit(Integer contratId, Integer demandeurId) {
         Authentication auth = currentAuth();
-        if (!hasRole(auth, "ADMIN") && !hasRole(auth, "GESTIONNAIRE")) throw new AccessDeniedException("Opération réservée au gestionnaire.");
-        Contrat contract = contratRepo.findById(contratId).orElseThrow(() -> new RuntimeException("Contrat non trouvé"));
-        if (!hasRole(auth, "ADMIN") && !currentUserId(auth).equals(contract.getResponsableId())) throw new AccessDeniedException("Ce contrat ne relève pas de votre périmètre.");
-        if (!"BROUILLON".equals(contract.getStatut()) && !"EN_ATTENTE".equals(contract.getStatut())) throw new IllegalArgumentException("Seul un brouillon peut être soumis en validation.");
-        if (validationsRepo.findByContratId(contratId).stream().anyMatch(v -> "EN_ATTENTE".equals(v.getDecision()))) throw new IllegalArgumentException("Un circuit de validation est déjà en cours.");
+        if (!hasRole(auth, "ADMIN") && !hasRole(auth, "GESTIONNAIRE"))
+            throw new AccessDeniedException("Opération réservée au gestionnaire.");
+        Contrat contract = contratRepo.findById(contratId)
+                .orElseThrow(() -> new RuntimeException("Contrat non trouvé"));
+        if (!hasRole(auth, "ADMIN") && !currentUserId(auth).equals(contract.getResponsableId()))
+            throw new AccessDeniedException("Ce contrat ne relève pas de votre périmètre.");
+        if (!"BROUILLON".equals(contract.getStatut()) && !"EN_ATTENTE".equals(contract.getStatut()))
+            throw new IllegalArgumentException("Seul un brouillon peut être soumis en validation.");
+        if (validationsRepo.findByContratId(contratId).stream().anyMatch(v -> "EN_ATTENTE".equals(v.getDecision())))
+            throw new IllegalArgumentException("Un circuit de validation est déjà en cours.");
         demandeurId = currentUserId(auth);
         Integer cycle = validationsRepo.findTopByContratIdOrderByCycleDesc(contratId)
                 .map(previous -> previous.getCycle() + 1)
                 .orElse(1);
-        List<com.suivicontrats.front.entity.ReglesValidation> circuit = reglesValidationService.getCircuit(contract.getTypeId(), contract.getMontant());
+        List<com.suivicontrats.front.entity.ReglesValidation> circuit = reglesValidationService
+                .getCircuit(contract.getTypeId(), contract.getMontant());
         if (circuit.isEmpty()) {
             String message = "Aucune règle active ne couvre le type et le montant du contrat "
-                + contract.getReference() + " (" + contract.getMontant().toPlainString() + " "
-                + contract.getDevise() + "). Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
+                    + contract.getReference() + " (" + contract.getMontant().toPlainString() + " "
+                    + contract.getDevise() + "). Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
             notificationsService.notifyMissingRuleForContract(contratId,
-                "Aucune règle de validation applicable", message);
-            throw new IllegalArgumentException("Aucune règle de validation ne couvre le type et le montant de ce contrat.");
+                    "Aucune règle de validation applicable", message);
+            throw new IllegalArgumentException(
+                    "Aucune règle de validation ne couvre le type et le montant de ce contrat.");
         }
         List<Validations> steps = new java.util.ArrayList<>();
         Integer firstLevel = circuit.stream().map(com.suivicontrats.front.entity.ReglesValidation::getNiveau)
@@ -73,12 +82,13 @@ public class ValidationsService {
             };
             for (String requiredRole : requiredRoles) {
                 steps.add(Validations.builder().contratId(contratId).demandeurId(demandeurId)
-                    .niveau(rule.getNiveau()).roleRequis(requiredRole)
-                    .valideurId("VALIDEUR_ET_JURIDIQUE".equals(rule.getRoleRequis())
-                            ? ("VALIDEUR".equals(requiredRole) ? rule.getValideurId() : null)
-                            : rule.getValideurId()).cycle(cycle)
-                    .decision(rule.getNiveau().equals(firstLevel) ? "EN_ATTENTE" : "A_VENIR")
-                    .dateSoumission(LocalDateTime.now()).build());
+                        .niveau(rule.getNiveau()).roleRequis(requiredRole)
+                        .valideurId("VALIDEUR_ET_JURIDIQUE".equals(rule.getRoleRequis())
+                                ? ("VALIDEUR".equals(requiredRole) ? rule.getValideurId() : null)
+                                : rule.getValideurId())
+                        .cycle(cycle)
+                        .decision(rule.getNiveau().equals(firstLevel) ? "EN_ATTENTE" : "A_VENIR")
+                        .dateSoumission(LocalDateTime.now()).build());
             }
         }
         List<Validations> saved = validationsRepo.saveAll(steps);
@@ -96,14 +106,16 @@ public class ValidationsService {
     }
 
     @Transactional
-    public Validations decider(Long validationId, Integer valideurId, String decision, String commentaire){
+    public Validations decider(Long validationId, Integer valideurId, String decision, String commentaire) {
         Authentication auth = currentAuth();
-        if (!valideurId.equals(currentUserId(auth))) throw new AccessDeniedException("Décision réservée à l'utilisateur connecté.");
+        if (!valideurId.equals(currentUserId(auth)))
+            throw new AccessDeniedException("Décision réservée à l'utilisateur connecté.");
         if (!List.of("APPROUVE", "REJETE", "MODIFICATION_DEMANDEE").contains(decision)) {
             throw new IllegalArgumentException("Décision de validation invalide");
         }
         if ("MODIFICATION_DEMANDEE".equals(decision) && (commentaire == null || commentaire.isBlank())) {
-            throw new IllegalArgumentException("Un commentaire est obligatoire pour justifier la demande de modification.");
+            throw new IllegalArgumentException(
+                    "Un commentaire est obligatoire pour justifier la demande de modification.");
         }
         Validations v = getOne(validationId);
         String requiredRole = "ROLE_" + v.getRoleRequis();
@@ -118,17 +130,25 @@ public class ValidationsService {
         v.setCommentaire(commentaire);
         v.setDateValidation(LocalDateTime.now());
         Validations saved = validationsRepo.save(v);
-        List<Validations> cycleSteps = validationsRepo.findByContratIdAndCycleOrderByNiveauAsc(v.getContratId(), v.getCycle());
+        List<Validations> cycleSteps = validationsRepo.findByContratIdAndCycleOrderByNiveauAsc(v.getContratId(),
+                v.getCycle());
         List<Validations> sameLevel = cycleSteps.stream().filter(s -> s.getNiveau().equals(v.getNiveau())).toList();
         boolean levelApproved = sameLevel.stream().allMatch(s -> s.getId().equals(saved.getId())
-                ? "APPROUVE".equals(decision) : "APPROUVE".equals(s.getDecision()));
+                ? "APPROUVE".equals(decision)
+                : "APPROUVE".equals(s.getDecision()));
         if (!"APPROUVE".equals(decision)) {
             cycleSteps.stream().filter(s -> ("A_VENIR".equals(s.getDecision())
-                            || (s.getNiveau().equals(v.getNiveau()) && "EN_ATTENTE".equals(s.getDecision())))
-                            && !s.getId().equals(saved.getId()))
-                    .forEach(s -> { s.setDecision("NON_REQUISE"); validationsRepo.save(s); });
+                    || (s.getNiveau().equals(v.getNiveau()) && "EN_ATTENTE".equals(s.getDecision())))
+                    && !s.getId().equals(saved.getId()))
+                    .forEach(s -> {
+                        s.setDecision("NON_REQUISE");
+                        validationsRepo.save(s);
+                    });
             cycleSteps.stream().filter(s -> "A_VENIR".equals(s.getDecision()))
-                    .forEach(s -> { s.setDecision("NON_REQUISE"); validationsRepo.save(s); });
+                    .forEach(s -> {
+                        s.setDecision("NON_REQUISE");
+                        validationsRepo.save(s);
+                    });
         }
 
         List<Validations> nextLevelSteps = List.of();
@@ -139,21 +159,27 @@ public class ValidationsService {
             if (nextLevel != null) {
                 nextLevelSteps = cycleSteps.stream().filter(s -> s.getNiveau().equals(nextLevel)
                         && "A_VENIR".equals(s.getDecision())).toList();
-                for (Validations next : nextLevelSteps) next.setDecision("EN_ATTENTE");
+                for (Validations next : nextLevelSteps)
+                    next.setDecision("EN_ATTENTE");
                 validationsRepo.saveAll(nextLevelSteps);
             }
         }
         final List<Validations> activatedSteps = nextLevelSteps;
         final boolean approvalsComplete = "APPROUVE".equals(decision) && levelApproved && activatedSteps.isEmpty();
         final boolean waitingForCoApproval = "APPROUVE".equals(decision) && !levelApproved;
-        String reference = contratRepo.findById(v.getContratId()).map(Contrat::getReference).orElse("#" + v.getContratId());
+        String reference = contratRepo.findById(v.getContratId()).map(Contrat::getReference)
+                .orElse("#" + v.getContratId());
         activatedSteps.forEach(step -> notifierEtape(step, reference));
         contratRepo.findById(v.getContratId()).ifPresent(contract -> {
             String ancienStatut = contract.getStatut();
-            if (approvalsComplete) contract.setStatut("APPROUVE");
-            else if ("APPROUVE".equals(decision)) contract.setStatut("EN_VALIDATION");
-            else if ("REJETE".equals(decision)) contract.setStatut("REJETE");
-            else contract.setStatut("BROUILLON");
+            if (approvalsComplete)
+                contract.setStatut("APPROUVE");
+            else if ("APPROUVE".equals(decision))
+                contract.setStatut("EN_VALIDATION");
+            else if ("REJETE".equals(decision))
+                contract.setStatut("REJETE");
+            else
+                contract.setStatut("BROUILLON");
             contratRepo.save(contract);
 
             String action = switch (decision) {
@@ -162,7 +188,8 @@ public class ValidationsService {
                 default -> "MODIFICATION_DEMANDEE";
             };
             String nouvelleValeur = "statut=" + contract.getStatut() + "; decision=" + decision;
-            if (commentaire != null && !commentaire.isBlank()) nouvelleValeur += "; commentaire=" + commentaire.trim();
+            if (commentaire != null && !commentaire.isBlank())
+                nouvelleValeur += "; commentaire=" + commentaire.trim();
             journauxAuditService.record(
                     valideurId, contract.getId(), contract.getReference(), action,
                     "statut=" + ancienStatut + "; decision=EN_ATTENTE", nouvelleValeur);
@@ -171,17 +198,24 @@ public class ValidationsService {
             String acteur = "JURIDIQUE".equals(v.getRoleRequis()) ? "Le Juridique" : "Le valideur";
             if (waitingForCoApproval) {
                 notificationsService.notifyUser(responsableId, contract.getId(), "Approbation partielle",
-                        acteur + " a donné son accord à l'étape " + v.getNiveau() + " du contrat " + contract.getReference()
-                                + "; l'autre rôle requis doit encore approuver.", "VALIDATION");
+                        acteur + " a donné son accord à l'étape " + v.getNiveau() + " du contrat "
+                                + contract.getReference()
+                                + "; l'autre rôle requis doit encore approuver.",
+                        "VALIDATION");
             } else if ("MODIFICATION_DEMANDEE".equals(decision)) {
-                String message = acteur + " a demandé des modifications pour le contrat " + contract.getReference() + ". Commentaire : " + commentaire.trim();
-                notificationsService.notifyUser(responsableId, contract.getId(), "Modifications demandées", message, "VALIDATION");
+                String message = acteur + " a demandé des modifications pour le contrat " + contract.getReference()
+                        + ". Commentaire : " + commentaire.trim();
+                notificationsService.notifyUser(responsableId, contract.getId(), "Modifications demandées", message,
+                        "VALIDATION");
             } else if (approvalsComplete) {
-                notificationsService.notifyUser(responsableId, contract.getId(), "Contrat approuvé", "Le contrat " + contract.getReference() + " a été approuvé.", "VALIDATION");
+                notificationsService.notifyUser(responsableId, contract.getId(), "Contrat approuvé",
+                        "Le contrat " + contract.getReference() + " a été approuvé.", "VALIDATION");
             } else if ("REJETE".equals(decision)) {
                 String message = "Le contrat " + contract.getReference() + " a été rejeté.";
-                if (commentaire != null && !commentaire.isBlank()) message += " Commentaire : " + commentaire.trim();
-                notificationsService.notifyUser(responsableId, contract.getId(), "Contrat rejeté", message, "VALIDATION");
+                if (commentaire != null && !commentaire.isBlank())
+                    message += " Commentaire : " + commentaire.trim();
+                notificationsService.notifyUser(responsableId, contract.getId(), "Contrat rejeté", message,
+                        "VALIDATION");
             }
         });
         return saved;
@@ -189,17 +223,22 @@ public class ValidationsService {
 
     /**
      * Envoie une notification uniquement au rôle de cette étape (ou à l'utilisateur
-     * explicitement affecté). Dans un circuit double, chaque étape possède son rôle.
+     * explicitement affecté). Dans un circuit double, chaque étape possède son
+     * rôle.
      */
     private void notifierEtape(Validations validation, String reference) {
         String title = "JURIDIQUE".equals(validation.getRoleRequis())
-                ? "Contrat à approuver par le Juridique" : "Contrat à valider";
-        String message = "Le contrat " + reference + " attend votre validation de niveau " + validation.getNiveau() + ".";
+                ? "Contrat à approuver par le Juridique"
+                : "Contrat à valider";
+        String message = "Le contrat " + reference + " attend votre validation de niveau " + validation.getNiveau()
+                + ".";
         if (validation.getValideurId() != null) {
-            notificationsService.notifyUser(validation.getValideurId(), validation.getContratId(), title, message, "VALIDATION");
+            notificationsService.notifyUser(validation.getValideurId(), validation.getContratId(), title, message,
+                    "VALIDATION");
         } else {
             Utilisateurs.Role role = Utilisateurs.Role.valueOf(validation.getRoleRequis());
-            notificationsService.notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), validation.getContratId(), title, message, "VALIDATION");
+            notificationsService.notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), validation.getContratId(),
+                    title, message, "VALIDATION");
         }
     }
 
@@ -208,11 +247,12 @@ public class ValidationsService {
      * Un valideur et le service juridique ne doivent jamais consulter les
      * décisions ni les commentaires internes de l'autre rôle.
      */
-    public List<Validations> all(){
+    public List<Validations> all() {
         Authentication auth = currentAuth();
 
         // L'administrateur conserve une vue globale d'audit.
-        if (hasRole(auth, "ADMIN")) return validationsRepo.findAll();
+        if (hasRole(auth, "ADMIN"))
+            return validationsRepo.findAll();
 
         Integer userId = currentUserId(auth);
         var rows = validationsRepo.findAll();
@@ -220,9 +260,11 @@ public class ValidationsService {
         // Le gestionnaire suit les validations de ses contrats et ses propres demandes.
         if (hasRole(auth, "GESTIONNAIRE")) {
             return rows.stream().filter(v -> userId.equals(v.getDemandeurId())
-                    || (auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + v.getRoleRequis()))
-                    && (userId.equals(v.getValideurId())
-                    || (v.getValideurId() == null && "EN_ATTENTE".equals(v.getDecision()))))).toList();
+                    || (auth.getAuthorities().stream()
+                            .anyMatch(a -> a.getAuthority().equals("ROLE_" + v.getRoleRequis()))
+                            && (userId.equals(v.getValideurId())
+                                    || (v.getValideurId() == null && "EN_ATTENTE".equals(v.getDecision())))))
+                    .toList();
         }
 
         // Les rôles de validation ne reçoivent que leurs étapes propres.
@@ -243,13 +285,15 @@ public class ValidationsService {
     }
 
     public Validations create(Validations validation) {
-        if (!hasRole(currentAuth(), "ADMIN")) throw new AccessDeniedException("Opération réservée à l'administrateur.");
+        if (!hasRole(currentAuth(), "ADMIN"))
+            throw new AccessDeniedException("Opération réservée à l'administrateur.");
         validation.setId(null);
         return validationsRepo.save(validation);
     }
 
     public Validations update(Long id, Validations details) {
-        if (!hasRole(currentAuth(), "ADMIN")) throw new AccessDeniedException("Opération réservée à l'administrateur.");
+        if (!hasRole(currentAuth(), "ADMIN"))
+            throw new AccessDeniedException("Opération réservée à l'administrateur.");
         Validations validation = getOne(id);
         validation.setContratId(details.getContratId());
         validation.setValideurId(details.getValideurId());
@@ -265,15 +309,23 @@ public class ValidationsService {
     }
 
     public void delete(Long id) {
-        if (!hasRole(currentAuth(), "ADMIN")) throw new AccessDeniedException("Opération réservée à l'administrateur.");
+        if (!hasRole(currentAuth(), "ADMIN"))
+            throw new AccessDeniedException("Opération réservée à l'administrateur.");
         validationsRepo.delete(getOne(id));
     }
 
     private Authentication currentAuth() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof Integer)) throw new AccessDeniedException("Authentification requise");
+        if (auth == null || !(auth.getPrincipal() instanceof Integer))
+            throw new AccessDeniedException("Authentification requise");
         return auth;
     }
-    private Integer currentUserId(Authentication auth) { return (Integer) auth.getPrincipal(); }
-    private boolean hasRole(Authentication auth, String role) { return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role)); }
+
+    private Integer currentUserId(Authentication auth) {
+        return (Integer) auth.getPrincipal();
+    }
+
+    private boolean hasRole(Authentication auth, String role) {
+        return auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role));
+    }
 }

@@ -12,7 +12,9 @@ import java.util.Map;
 import com.suivicontrats.front.service.UtilisateursService;
 import com.suivicontrats.front.service.JournauxAuditService;
 
-@RestController @RequestMapping("/api/auth") @RequiredArgsConstructor
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
     private final UtilisateursService utilisateursService;
@@ -20,11 +22,13 @@ public class AuthController {
     private final JwtService jwtService;
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest body){
-        try{ return ResponseEntity.ok(authService.login(body)); }
-        catch(RuntimeException e){ return ResponseEntity.status(401).body(Map.of("message", e.getMessage())); }
+    public ResponseEntity<?> login(@RequestBody LoginRequest body) {
+        try {
+            return ResponseEntity.ok(authService.login(body));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(401).body(Map.of("message", e.getMessage()));
+        }
     }
-
 
     // Enregistre la déconnexion avant que le frontend ne supprime le token.
     @PostMapping("/logout")
@@ -49,7 +53,8 @@ public class AuthController {
     }
 
     @PostMapping("/session-end")
-    public ResponseEntity<?> sessionEnd(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
+    public ResponseEntity<?> sessionEnd(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             return ResponseEntity.status(401).body(Map.of("message", "Jeton de session manquant."));
         }
@@ -63,8 +68,8 @@ public class AuthController {
     }
 
     @PostMapping("/demande-acces")
-    public Map<String,String> demande(@RequestBody Map<String,String> b){
-        return Map.of("message","Demande reçue pour "+b.get("email"));
+    public Map<String, String> demande(@RequestBody Map<String, String> b) {
+        return Map.of("message", "Demande reçue pour " + b.get("email"));
     }
 
     @PostMapping("/change-password")
@@ -72,10 +77,11 @@ public class AuthController {
         try {
             Integer authenticatedUserId = (Integer) authentication.getPrincipal();
             if (!authenticatedUserId.toString().equals(body.get("userId"))) {
-                return ResponseEntity.status(403).body(Map.of("message", "Vous ne pouvez modifier que votre propre mot de passe."));
+                return ResponseEntity.status(403)
+                        .body(Map.of("message", "Vous ne pouvez modifier que votre propre mot de passe."));
             }
             utilisateursService.changerMotDePasse(
-                authenticatedUserId, body.get("motDePasseActuel"), body.get("nouveauMotDePasse"));
+                    authenticatedUserId, body.get("motDePasseActuel"), body.get("nouveauMotDePasse"));
             return ResponseEntity.ok(Map.of("message", "Mot de passe modifié."));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));

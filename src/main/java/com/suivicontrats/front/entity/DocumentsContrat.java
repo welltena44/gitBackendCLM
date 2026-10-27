@@ -5,9 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "documents_contrat", indexes = @Index(
-        name = "idx_documents_contrat_contrat",
-        columnList = "documents_contrat_contrat_id"))
+@Table(name = "documents_contrat", indexes = @Index(name = "idx_documents_contrat_contrat", columnList = "documents_contrat_contrat_id"))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -46,8 +44,10 @@ public class DocumentsContrat {
     private LocalDateTime dateImport;
 
     @PrePersist
-    public void prePersist(){
-        if(dateImport == null) dateImport = LocalDateTime.now();
-        if(version == null) version = 1;
+    public void prePersist() {
+        if (dateImport == null)
+            dateImport = LocalDateTime.now();
+        if (version == null)
+            version = 1;
     }
 }

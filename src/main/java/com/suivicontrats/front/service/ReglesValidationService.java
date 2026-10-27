@@ -24,16 +24,20 @@ public class ReglesValidationService {
     private final UtilisateursRepository utilisateursRepo;
     private final NotificationsService notificationsService;
 
-    public List<ReglesValidation> getAll(){ return repo.findAllByOrderByNiveauAsc(); }
+    public List<ReglesValidation> getAll() {
+        return repo.findAllByOrderByNiveauAsc();
+    }
 
-    public ReglesValidation getOne(Long id){
+    public ReglesValidation getOne(Long id) {
         return repo.findById(id).orElseThrow(() -> new RuntimeException("Règle de validation non trouvée"));
     }
-    
-    public List<ReglesValidation> getByType(Long typeId){ return repo.findByTypeContratIdOrderByNiveauAsc(typeId); }
+
+    public List<ReglesValidation> getByType(Long typeId) {
+        return repo.findByTypeContratIdOrderByNiveauAsc(typeId);
+    }
 
     @Transactional
-    public ReglesValidation create(ReglesValidation r){
+    public ReglesValidation create(ReglesValidation r) {
         requireAdmin();
         if (r.getTypeContratId() == null)
             throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
@@ -50,7 +54,7 @@ public class ReglesValidationService {
     }
 
     @Transactional
-    public ReglesValidation update(Long id, ReglesValidation r){
+    public ReglesValidation update(Long id, ReglesValidation r) {
         Authentication auth = requireAdminOrJuridique();
         ReglesValidation existing = getOne(id);
         if (hasRole(auth, "JURIDIQUE")) {
@@ -61,7 +65,8 @@ public class ReglesValidationService {
             ReglesValidation saved = repo.save(existing);
             notificationsService.notifyRuleRole(Utilisateurs.Role.ADMIN,
                     saved.getId(), "Seuil de validation à confirmer",
-                    "Le Juridique a défini le seuil de la règle de niveau " + saved.getNiveau() + ". Confirmez son activation.");
+                    "Le Juridique a défini le seuil de la règle de niveau " + saved.getNiveau()
+                            + ". Confirmez son activation.");
             return saved;
         } else {
             validateWorkflow(r);
@@ -77,7 +82,8 @@ public class ReglesValidationService {
             ReglesValidation saved = repo.save(existing);
             notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
                     saved.getId(), "Circuit de validation modifié",
-                    "L’ADMIN a modifié une règle de niveau " + saved.getNiveau() + ". Vérifiez et redéfinissez son seuil.");
+                    "L’ADMIN a modifié une règle de niveau " + saved.getNiveau()
+                            + ". Vérifiez et redéfinissez son seuil.");
             return saved;
         }
     }
@@ -91,19 +97,19 @@ public class ReglesValidationService {
         validateThresholds(rule);
         ensureUniqueLevel(rule, id);
         List<Contrat> previouslyUnmatched = contratRepo.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE")).stream()
-            .filter(contract -> rule.getTypeContratId() == null
-                || java.util.Objects.equals(contract.getTypeId(), rule.getTypeContratId()))
-            .filter(contract -> getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
-            .toList();
+                .filter(contract -> rule.getTypeContratId() == null
+                        || java.util.Objects.equals(contract.getTypeId(), rule.getTypeContratId()))
+                .filter(contract -> getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+                .toList();
         rule.setStatut("ACTIVE");
         ReglesValidation saved = repo.save(rule);
         previouslyUnmatched.stream()
-            .filter(contract -> !getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
-            .forEach(contract -> notificationsService.notifyUser(contract.getResponsableId(), contract.getId(),
-                "Seuil de validation disponible",
-                "Le seuil de validation du contrat " + contract.getReference()
-                    + " est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
-                "INFO"));
+                .filter(contract -> !getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+                .forEach(contract -> notificationsService.notifyUser(contract.getResponsableId(), contract.getId(),
+                        "Seuil de validation disponible",
+                        "Le seuil de validation du contrat " + contract.getReference()
+                                + " est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
+                        "INFO"));
         notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
                 saved.getId(), "Règle de validation activée",
                 "L’ADMIN a confirmé et activé la règle de niveau " + saved.getNiveau() + ".");
@@ -118,7 +124,8 @@ public class ReglesValidationService {
     }
 
     private void validateWorkflow(ReglesValidation r) {
-        if (r.getNiveau() == null || r.getNiveau() < 1) throw new IllegalArgumentException("Le niveau de validation doit être positif.");
+        if (r.getNiveau() == null || r.getNiveau() < 1)
+            throw new IllegalArgumentException("Le niveau de validation doit être positif.");
         if (!List.of("VALIDEUR", "JURIDIQUE", "VALIDEUR_ET_JURIDIQUE").contains(r.getRoleRequis()))
             throw new IllegalArgumentException("Le rôle requis doit être VALIDEUR, JURIDIQUE ou les deux.");
         if ("VALIDEUR_ET_JURIDIQUE".equals(r.getRoleRequis()) && r.getValideurId() == null)
@@ -128,19 +135,22 @@ public class ReglesValidationService {
                     .orElseThrow(() -> new IllegalArgumentException("L'utilisateur sélectionné n'existe pas."));
             String expectedRole = "VALIDEUR_ET_JURIDIQUE".equals(r.getRoleRequis()) ? "VALIDEUR" : r.getRoleRequis();
             if (!user.getRole().name().equals(expectedRole) || !Boolean.TRUE.equals(user.getActif()))
-                throw new IllegalArgumentException("L'utilisateur ciblé doit être actif et avoir le rôle " + expectedRole + ".");
+                throw new IllegalArgumentException(
+                        "L'utilisateur ciblé doit être actif et avoir le rôle " + expectedRole + ".");
         }
     }
 
     private void ensureUniqueLevel(ReglesValidation candidate, Long excludedId) {
         boolean duplicate = repo.findAll().stream()
                 .filter(existing -> excludedId == null || !excludedId.equals(existing.getId()))
-                .filter(existing -> "ACTIVE".equals(existing.getStatut()) || "EN_ATTENTE_CONFIRMATION".equals(existing.getStatut()))
-                .anyMatch(existing -> java.util.Objects.equals(existing.getTypeContratId(), candidate.getTypeContratId())
-                        && sameAmount(existing.getMontantMinimum(), candidate.getMontantMinimum())
-                        && sameAmount(existing.getMontantMaximum(), candidate.getMontantMaximum())
-                        && java.util.Objects.equals(existing.getNiveau(), candidate.getNiveau())
-                        && overlapsRoles(existing.getRoleRequis(), candidate.getRoleRequis()));
+                .filter(existing -> "ACTIVE".equals(existing.getStatut())
+                        || "EN_ATTENTE_CONFIRMATION".equals(existing.getStatut()))
+                .anyMatch(
+                        existing -> java.util.Objects.equals(existing.getTypeContratId(), candidate.getTypeContratId())
+                                && sameAmount(existing.getMontantMinimum(), candidate.getMontantMinimum())
+                                && sameAmount(existing.getMontantMaximum(), candidate.getMontantMaximum())
+                                && java.util.Objects.equals(existing.getNiveau(), candidate.getNiveau())
+                                && overlapsRoles(existing.getRoleRequis(), candidate.getRoleRequis()));
         if (duplicate)
             throw new IllegalArgumentException("Ce seuil possède déjà une étape pour ce rôle à ce niveau.");
     }
@@ -159,7 +169,7 @@ public class ReglesValidationService {
         return first == null ? second == null : second != null && first.compareTo(second) == 0;
     }
 
-    public void delete(Long id){
+    public void delete(Long id) {
         Authentication auth = requireAdminOrJuridique();
         if (!hasRole(auth, "ADMIN")) {
             throw new AccessDeniedException("La suppression d'une étape de circuit est réservée à l'administrateur.");
@@ -170,7 +180,8 @@ public class ReglesValidationService {
     private Authentication requireAdmin() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !hasRole(auth, "ADMIN"))
-            throw new AccessDeniedException("La création et la confirmation des règles sont réservées à l’administrateur.");
+            throw new AccessDeniedException(
+                    "La création et la confirmation des règles sont réservées à l’administrateur.");
         return auth;
     }
 
@@ -187,7 +198,7 @@ public class ReglesValidationService {
     }
 
     // C'est ce que tu vas appeler pour un contrat
-    public List<ReglesValidation> getCircuit(Long typeContratId, BigDecimal montant){
+    public List<ReglesValidation> getCircuit(Long typeContratId, BigDecimal montant) {
         java.util.Map<Integer, List<ReglesValidation>> byLevel = new java.util.HashMap<>();
         for (ReglesValidation rule : repo.findCircuitApplicable(typeContratId, montant)) {
             byLevel.computeIfAbsent(rule.getNiveau(), ignored -> new java.util.ArrayList<>()).add(rule);
@@ -202,7 +213,8 @@ public class ReglesValidationService {
                     // Une règle propre au type remplace le rôle correspondant de la règle globale,
                     // sans effacer une approbation globale distincte au même niveau.
                     return rules.stream().filter(r -> {
-                        if (typeContratId != null && typeContratId.equals(r.getTypeContratId())) return true;
+                        if (typeContratId != null && typeContratId.equals(r.getTypeContratId()))
+                            return true;
                         return rolesIn(r.getRoleRequis()).stream().noneMatch(typeSpecificRoles::contains);
                     });
                 }).toList();

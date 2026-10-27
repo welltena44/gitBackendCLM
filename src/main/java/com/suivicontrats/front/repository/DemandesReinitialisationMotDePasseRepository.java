@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface DemandesReinitialisationMotDePasseRepository
-        extends JpaRepository<DemandesReinitialisationMotDePasse, Long> {
-    List<DemandesReinitialisationMotDePasse> findByStatutOrderByDateCreationAsc(
-            DemandesReinitialisationMotDePasse.Statut statut);
-    Optional<DemandesReinitialisationMotDePasse> findFirstByUtilisateur_IdAndStatut(
-            Integer utilisateurId, DemandesReinitialisationMotDePasse.Statut statut);
+                extends JpaRepository<DemandesReinitialisationMotDePasse, Long> {
+        List<DemandesReinitialisationMotDePasse> findByStatutOrderByDateCreationAsc(
+                        DemandesReinitialisationMotDePasse.Statut statut);
+
+        Optional<DemandesReinitialisationMotDePasse> findFirstByUtilisateur_IdAndStatut(
+                        Integer utilisateurId, DemandesReinitialisationMotDePasse.Statut statut);
 }

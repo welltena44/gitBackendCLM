@@ -16,27 +16,35 @@ public class VersionsContratController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','JURIDIQUE')")
-    public List<VersionsContrat> all(){ return service.all(); }
+    public List<VersionsContrat> all() {
+        return service.all();
+    }
 
     @GetMapping("/contrat/{contratId}")
-    public List<VersionsContrat> byContrat(@PathVariable Integer contratId){
+    public List<VersionsContrat> byContrat(@PathVariable Integer contratId) {
         return service.byContrat(contratId);
     }
 
     @GetMapping("/{id}")
-    public VersionsContrat one(@PathVariable Long id){ return service.getOne(id); }
+    public VersionsContrat one(@PathVariable Long id) {
+        return service.getOne(id);
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public VersionsContrat create(@RequestBody VersionsContrat v){ return service.save(v); }
+    public VersionsContrat create(@RequestBody VersionsContrat v) {
+        return service.save(v);
+    }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public VersionsContrat update(@PathVariable Long id, @RequestBody VersionsContrat v){
+    public VersionsContrat update(@PathVariable Long id, @RequestBody VersionsContrat v) {
         return service.update(id, v);
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public void delete(@PathVariable Long id){ service.delete(id); }
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
+    }
 }

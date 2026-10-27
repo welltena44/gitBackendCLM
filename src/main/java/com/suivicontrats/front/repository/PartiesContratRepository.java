@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface PartiesContratRepository extends JpaRepository<PartiesContrat, Long> {
     List<PartiesContrat> findByContratId(Integer contratId);
+
     List<PartiesContrat> findByType(String type);
+
     List<PartiesContrat> findByNomContainingIgnoreCase(String nom);
 }

@@ -23,7 +23,8 @@ public class DemandesReinitialisationController {
         } catch (NumberFormatException ignored) {
             // Réponse identique pour éviter de révéler l'existence d'un matricule.
         }
-        if (matricule != null) service.soumettre(matricule);
+        if (matricule != null)
+            service.soumettre(matricule);
         return ResponseEntity.accepted().body(Map.of("message",
                 "Si ce matricule correspond à un compte actif, la demande a été transmise à l'administrateur."));
     }

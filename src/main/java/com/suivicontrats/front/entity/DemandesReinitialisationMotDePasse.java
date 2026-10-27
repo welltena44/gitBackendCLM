@@ -31,5 +31,7 @@ public class DemandesReinitialisationMotDePasse {
     @Column(name = "date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
 
-    public enum Statut { EN_ATTENTE, APPROUVEE, REJETEE }
+    public enum Statut {
+        EN_ATTENTE, APPROUVEE, REJETEE
+    }
 }

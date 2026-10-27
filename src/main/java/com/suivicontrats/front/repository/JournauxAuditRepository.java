@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface JournauxAuditRepository extends JpaRepository<JournauxAudit, Long> {
     List<JournauxAudit> findByContratIdOrderByDateActionDesc(Integer contratId);
+
     List<JournauxAudit> findByUtilisateurIdOrderByDateActionDesc(Integer utilisateurId);
+
     List<JournauxAudit> findAllByOrderByDateActionDesc();
 }

@@ -15,27 +15,33 @@ public class PartiesContratController {
 
     // Liste toutes les parties
     @GetMapping("/parties-contrat")
-    public List<PartiesContrat> all() { return service.getAll(); }
+    public List<PartiesContrat> all() {
+        return service.getAll();
+    }
 
     @GetMapping("/parties-contrat/{id}")
-    public PartiesContrat one(@PathVariable Long id){ return service.getOne(id); }
+    public PartiesContrat one(@PathVariable Long id) {
+        return service.getOne(id);
+    }
 
     // Parties d'un contrat précis -> GET /api/contrats/1/parties
     @GetMapping("/contrats/{contratId}/parties")
-    public List<PartiesContrat> byContrat(@PathVariable Integer contratId){
+    public List<PartiesContrat> byContrat(@PathVariable Integer contratId) {
         return service.getByContrat(contratId);
     }
 
     @PostMapping("/parties-contrat")
-    public PartiesContrat create(@RequestBody PartiesContrat p){
+    public PartiesContrat create(@RequestBody PartiesContrat p) {
         return service.create(p);
     }
 
     @PutMapping("/parties-contrat/{id}")
-    public PartiesContrat update(@PathVariable Long id, @RequestBody PartiesContrat p){
+    public PartiesContrat update(@PathVariable Long id, @RequestBody PartiesContrat p) {
         return service.update(id, p);
     }
 
     @DeleteMapping("/parties-contrat/{id}")
-    public void delete(@PathVariable Long id){ service.delete(id); }
+    public void delete(@PathVariable Long id) {
+        service.delete(id);
+    }
 }
