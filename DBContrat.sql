@@ -27,6 +27,8 @@ CREATE TABLE utilisateurs (
     utilisateurs_secret_2fa     VARCHAR(255),
     utilisateurs_enabled_2fa    BOOLEAN      NOT NULL DEFAULT FALSE,
     utilisateurs_changement_mot_de_passe_requis BOOLEAN NOT NULL DEFAULT FALSE,
+    utilisateurs_tentatives_echec INTEGER NOT NULL DEFAULT 0,
+    utilisateurs_verrouille_jusqua TIMESTAMP,
     utilisateurs_date_creation  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
@@ -78,6 +80,7 @@ CREATE TABLE contrats (
     contrats_cree_par                    INTEGER       REFERENCES utilisateurs(utilisateurs_id),
     contrats_date_creation               TIMESTAMP     NOT NULL DEFAULT NOW(),
     contrats_date_modification           TIMESTAMP     NOT NULL DEFAULT NOW(),
+    contrats_version_optimiste            BIGINT        NOT NULL DEFAULT 0,
     CONSTRAINT chk_dates CHECK (contrats_date_fin > contrats_date_debut)
 );
 
@@ -228,7 +231,7 @@ CREATE TABLE notifications (
     notifications_titre               VARCHAR(150)  NOT NULL,
     notifications_message             VARCHAR(500)  NOT NULL,
     notifications_type                VARCHAR(30)   NOT NULL
-                   CHECK (notifications_type IN ('ECHEANCE', 'RENOUVELLEMENT', 'RESILIATION', 'VALIDATION', 'AVENANT', 'INFO')),
+                   CHECK (notifications_type IN ('ECHEANCE', 'RENOUVELLEMENT', 'RESILIATION', 'VALIDATION', 'AVENANT', 'INFO', 'REGLE_VALIDATION', 'SEUIL_A_CONFIRMER')),
     notifications_lu                  BOOLEAN       NOT NULL DEFAULT FALSE,
     notifications_date_creation       TIMESTAMP     NOT NULL DEFAULT NOW()
 );

@@ -78,6 +78,11 @@ public class Contrat {
     @Column(name = "contrats_date_modification", nullable = false)
     private LocalDateTime dateModification;
 
+    // Verrouillage optimiste : empêche un formulaire ancien d'écraser une mise à jour récente.
+    @Version
+    @Column(name = "contrats_version_optimiste", nullable = false)
+    private Long versionOptimiste;
+
     @PrePersist
     protected void onCreate() {
         dateCreation = LocalDateTime.now();

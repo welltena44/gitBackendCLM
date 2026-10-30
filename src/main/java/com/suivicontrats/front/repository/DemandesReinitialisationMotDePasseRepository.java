@@ -10,6 +10,8 @@ public interface DemandesReinitialisationMotDePasseRepository
         List<DemandesReinitialisationMotDePasse> findByStatutOrderByDateCreationAsc(
                         DemandesReinitialisationMotDePasse.Statut statut);
 
+        List<DemandesReinitialisationMotDePasse> findAllByOrderByDateCreationDesc();
+
         Optional<DemandesReinitialisationMotDePasse> findFirstByUtilisateur_IdAndStatut(
                         Integer utilisateurId, DemandesReinitialisationMotDePasse.Statut statut);
 }

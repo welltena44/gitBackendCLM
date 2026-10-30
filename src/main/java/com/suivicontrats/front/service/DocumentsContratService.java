@@ -83,15 +83,22 @@ public class DocumentsContratService {
                 throw new IllegalArgumentException("Le contrat signé doit être un fichier PDF valide.");
         }
         if (file.isEmpty()) {
-            throw new RuntimeException("Fichier vide");
+            throw new IllegalArgumentException("Le fichier envoyé est vide.");
         }
 
         String originalName = file.getOriginalFilename();
+        if (originalName == null || originalName.isBlank() || originalName.contains("\\") || originalName.contains("/")) {
+            throw new IllegalArgumentException("Nom de fichier invalide.");
+        }
         String ext = "";
         if (originalName != null && originalName.contains(".")) {
             ext = originalName.substring(originalName.lastIndexOf("."));
         }
-        String storedName = UUID.randomUUID() + ext;
+        String extension = ext.toLowerCase(java.util.Locale.ROOT);
+        if (!List.of(".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".txt").contains(extension)) {
+            throw new IllegalArgumentException("Format de fichier non autorisé. Formats acceptés : PDF, Word, Excel, PNG, JPG et TXT.");
+        }
+        String storedName = UUID.randomUUID() + extension;
 
         Path contratPath = Paths.get(uploadDir, contratId.toString());
         Files.createDirectories(contratPath);
@@ -123,7 +130,7 @@ public class DocumentsContratService {
         Path path = Paths.get(doc.getChemin());
         Resource resource = new UrlResource(path.toUri());
         if (!resource.exists()) {
-            throw new RuntimeException("Fichier introuvable sur disque: " + doc.getChemin());
+            throw new RuntimeException("Fichier introuvable sur disque");
         }
         return resource;
     }

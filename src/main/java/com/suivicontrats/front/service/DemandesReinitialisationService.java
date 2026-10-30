@@ -37,7 +37,20 @@ public class DemandesReinitialisationService {
                 .stream()
                 .map(d -> new DemandeReinitialisationDTO(
                         d.getId(), d.getUtilisateur().getMatricule(),
-                        d.getUtilisateur().getPrenom() + " " + d.getUtilisateur().getNom(), d.getDateCreation()))
+                        d.getUtilisateur().getPrenom() + " " + d.getUtilisateur().getNom(),
+                        d.getStatut().name(), d.getDateCreation()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DemandeReinitialisationDTO> historique(Integer adminId) {
+        verifierAdministrateur(adminId);
+        return demandesRepository.findAllByOrderByDateCreationDesc()
+                .stream()
+                .map(d -> new DemandeReinitialisationDTO(
+                        d.getId(), d.getUtilisateur().getMatricule(),
+                        d.getUtilisateur().getPrenom() + " " + d.getUtilisateur().getNom(),
+                        d.getStatut().name(), d.getDateCreation()))
                 .toList();
     }
 

@@ -89,14 +89,13 @@ public class NotificationsService {
         notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), contractId, title, message, type);
     }
 
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    @Transactional
     public void notifyMissingRuleForContract(Integer contractId, String title, String message) {
         for (Utilisateurs.Role role : List.of(Utilisateurs.Role.ADMIN, Utilisateurs.Role.JURIDIQUE)) {
             utilisateursRepo.findByRoleAndActifTrue(role).stream()
                     .map(Utilisateurs::getId)
                     .filter(java.util.Objects::nonNull)
                     .distinct()
-                    .filter(userId -> !repo.existsByUtilisateurIdAndContratIdAndTitre(userId, contractId, title))
                     .forEach(userId -> saveForUser(userId, contractId, title, message, "INFO"));
         }
     }

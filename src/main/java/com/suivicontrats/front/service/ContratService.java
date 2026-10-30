@@ -5,6 +5,7 @@ import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.ValidationsRepository;
 import com.suivicontrats.front.repository.DocumentsContratRepository;
+import com.suivicontrats.front.repository.UtilisateursRepository;
 import org.springframework.transaction.annotation.Transactional;
 import com.suivicontrats.front.entity.Validations;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,11 +25,20 @@ public class ContratService {
     private final JournauxAuditService journauxAuditService;
     private final ReglesValidationService reglesValidationService;
     private final NotificationsService notificationsService;
+    private final UtilisateursRepository utilisateursRepo;
 
     public List<Contrat> getAll() {
         Authentication auth = currentAuth();
-        if (hasRole(auth, "ADMIN") || hasRole(auth, "JURIDIQUE"))
+        if (hasRole(auth, "ADMIN"))
             return contratRepo.findAll();
+        if (hasRole(auth, "JURIDIQUE")) {
+            // Le juridique ne doit pas voir les brouillons des gestionnaires :
+            // seuls les contrats ayant déjà un circuit de validation sont exposés.
+            var idsEnCircuit = validationsRepo.findAll().stream()
+                    .map(Validations::getContratId)
+                    .collect(java.util.stream.Collectors.toSet());
+            return contratRepo.findAllById(idsEnCircuit);
+        }
         if (hasRole(auth, "GESTIONNAIRE"))
             return contratRepo.findByResponsableId(currentUserId(auth));
         var validatorRoles = auth.getAuthorities().stream().map(a -> a.getAuthority())
@@ -72,6 +82,7 @@ public class ContratService {
         // Le responsable et le créateur sont toujours l'utilisateur authentifié.
         contrat.setResponsableId(currentUserId(auth));
         contrat.setCreePar(currentUserId(auth));
+        contrat.setService(serviceResponsable(contrat.getResponsableId()));
         if (!"BROUILLON".equals(contrat.getStatut()))
             throw new IllegalArgumentException("Un nouveau contrat doit commencer au statut brouillon.");
         if (hasRole(auth, "GESTIONNAIRE")) {
@@ -85,15 +96,7 @@ public class ContratService {
         Contrat saved = contratRepo.save(contrat);
         journauxAuditService.record(currentUserId(auth), saved.getId(), saved.getReference(),
                 "CONTRAT_CREE", null, auditSummary(saved));
-        if (reglesValidationService.getCircuit(saved.getTypeId(), saved.getMontant()).isEmpty()) {
-            String message = "Aucune règle active ne couvre le type et le montant du contrat "
-                    + saved.getReference() + " (" + saved.getMontant().toPlainString() + " " + saved.getDevise()
-                    + "). Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
-            notificationsService.notifyContractRole(Utilisateurs.Role.ADMIN, saved.getId(),
-                    "Aucune règle de validation applicable", message, "INFO");
-            notificationsService.notifyContractRole(Utilisateurs.Role.JURIDIQUE, saved.getId(),
-                    "Aucune règle de validation applicable", message, "INFO");
-        }
+        notifyIfNoValidationRule(saved);
         return saved;
     }
 
@@ -130,15 +133,36 @@ public class ContratService {
         c.setDateDebut(details.getDateDebut());
         c.setDateFin(details.getDateFin());
         c.setDureeMois(details.getDureeMois());
-        c.setService(details.getService());
         c.setRenouvellementAutomatique(details.getRenouvellementAutomatique());
         c.setJoursPreavis(details.getJoursPreavis());
-        c.setResponsableId(hasRole(auth, "GESTIONNAIRE") ? currentUserId(auth) : details.getResponsableId());
+        Integer responsableId = hasRole(auth, "GESTIONNAIRE") ? currentUserId(auth) : details.getResponsableId();
+        c.setResponsableId(responsableId);
+        c.setService(serviceResponsable(responsableId));
         c.setTypeId(details.getTypeId());
         Contrat saved = contratRepo.save(c);
         journauxAuditService.record(currentUserId(auth), saved.getId(), saved.getReference(),
                 "CONTRAT_MODIFIE", oldValue, auditSummary(saved));
+        notifyIfNoValidationRule(saved);
         return saved;
+    }
+
+    private String serviceResponsable(Integer responsableId) {
+        if (responsableId == null)
+            throw new IllegalArgumentException("Le responsable du contrat est obligatoire.");
+        return utilisateursRepo.findById(responsableId)
+                .orElseThrow(() -> new IllegalArgumentException("Le responsable du contrat est introuvable."))
+                .getService();
+    }
+
+    private void notifyIfNoValidationRule(Contrat contract) {
+        if (!reglesValidationService.getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+            return;
+        String amount = contract.getMontant() == null ? "non défini" : contract.getMontant().toPlainString();
+        String message = "Aucune règle active ne couvre le type de contrat #" + contract.getTypeId()
+                + " et le montant " + amount + " " + contract.getDevise() + " du contrat "
+                + contract.getReference() + ". Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
+        notificationsService.notifyMissingRuleForContract(
+                contract.getId(), "Aucune règle de validation applicable", message);
     }
 
     @Transactional

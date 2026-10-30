@@ -96,19 +96,24 @@ public class ReglesValidationService {
             throw new IllegalStateException("Seule une règle dont le seuil est défini peut être confirmée.");
         validateThresholds(rule);
         ensureUniqueLevel(rule, id);
-        List<Contrat> previouslyUnmatched = contratRepo.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE")).stream()
-                .filter(contract -> rule.getTypeContratId() == null
-                        || java.util.Objects.equals(contract.getTypeId(), rule.getTypeContratId()))
-                .filter(contract -> getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+        List<Contrat> newlyCoveredContracts = contratRepo.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE")).stream()
+            .filter(contract -> contract.getMontant() != null)
+            .filter(contract -> rule.getTypeContratId() == null
+                || java.util.Objects.equals(contract.getTypeId(), rule.getTypeContratId()))
+            .filter(contract -> rule.getMontantMinimum() != null
+                && rule.getMontantMinimum().compareTo(contract.getMontant()) <= 0)
+            .filter(contract -> rule.getMontantMaximum() == null
+                || rule.getMontantMaximum().compareTo(contract.getMontant()) > 0)
                 .toList();
         rule.setStatut("ACTIVE");
         ReglesValidation saved = repo.save(rule);
-        previouslyUnmatched.stream()
-                .filter(contract -> !getCircuit(contract.getTypeId(), contract.getMontant()).isEmpty())
+        newlyCoveredContracts.stream()
                 .forEach(contract -> notificationsService.notifyUser(contract.getResponsableId(), contract.getId(),
-                        "Seuil de validation disponible",
-                        "Le seuil de validation du contrat " + contract.getReference()
-                                + " est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
+                "Règle de validation désormais active",
+                "La règle de validation " + saved.getId() + " couvre désormais le type de contrat #"
+                    + contract.getTypeId() + " et le montant " + contract.getMontant() + " "
+                    + contract.getDevise() + " du contrat " + contract.getReference()
+                    + ". Vous pouvez le soumettre au circuit de validation.",
                         "INFO"));
         notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
                 saved.getId(), "Règle de validation activée",

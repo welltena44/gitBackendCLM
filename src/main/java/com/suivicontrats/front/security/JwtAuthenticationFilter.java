@@ -32,6 +32,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (userId != null) {
                 Utilisateurs user = utilisateursRepository.findById(userId).orElse(null);
                 if (user != null && Boolean.TRUE.equals(user.getActif()) && user.getRole() != null) {
+                    String path = request.getRequestURI();
+                    boolean allowedDuringForcedPasswordChange = path.equals("/api/auth/change-password")
+                            || path.equals("/api/auth/logout");
+                    if (Boolean.TRUE.equals(user.getChangementMotDePasseRequis())
+                            && !allowedDuringForcedPasswordChange) {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"message\":\"Veuillez modifier votre mot de passe avant de continuer.\"}");
+                        return;
+                    }
                     var authentication = new UsernamePasswordAuthenticationToken(
                             userId, null, List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
                     SecurityContextHolder.getContext().setAuthentication(authentication);

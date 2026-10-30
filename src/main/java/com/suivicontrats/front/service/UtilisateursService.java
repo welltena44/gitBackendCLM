@@ -4,6 +4,7 @@ package com.suivicontrats.front.service;
 import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.dto.ProfilRequest;
 import com.suivicontrats.front.dto.UtilisateursDTO;
+import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.UtilisateursRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +21,7 @@ public class UtilisateursService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final UtilisateursRepository repository;
+    private final ContratRepository contratRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
@@ -63,6 +65,7 @@ public class UtilisateursService {
     public UtilisateursDTO updateProfile(Integer id, ProfilRequest details) {
         Utilisateurs utilisateur = getOne(id);
         String ancienneAdresse = utilisateur.getEmail();
+        String ancienService = utilisateur.getService();
         String email = details.getEmail().trim();
         if (repository.findByEmailIgnoreCase(email)
                 .filter(existing -> !existing.getId().equals(id)).isPresent()) {
@@ -71,8 +74,9 @@ public class UtilisateursService {
         utilisateur.setNom(details.getNom().trim());
         utilisateur.setPrenom(details.getPrenom().trim());
         utilisateur.setEmail(email);
-        utilisateur.setService(details.getService() == null ? null : details.getService().trim());
+        utilisateur.setService(normaliserService(details.getService()));
         Utilisateurs saved = repository.save(utilisateur);
+        synchroniserServiceContrats(id, ancienService, saved.getService());
 
         if (!email.equalsIgnoreCase(ancienneAdresse)) {
             emailService.envoyerEmailModificationAdresse(
@@ -104,6 +108,7 @@ public class UtilisateursService {
         // Conserver l'ancien hash avant toute modification.
         String ancienHash = utilisateur.getMotDePasse();
         String ancienneAdresse = utilisateur.getEmail();
+        String ancienService = utilisateur.getService();
 
         if (details.getMatricule() != null) {
             utilisateur.setMatricule(details.getMatricule());
@@ -125,7 +130,7 @@ public class UtilisateursService {
             utilisateur.setRole(details.getRole());
         }
 
-        utilisateur.setService(details.getService());
+        utilisateur.setService(normaliserService(details.getService()));
 
         if (details.getActif() != null) {
             utilisateur.setActif(details.getActif());
@@ -155,6 +160,7 @@ public class UtilisateursService {
         }
 
         Utilisateurs savedUser = repository.save(utilisateur);
+        synchroniserServiceContrats(id, ancienService, savedUser.getService());
 
         boolean adresseModifiee = details.getEmail() != null
                 && !details.getEmail().equalsIgnoreCase(ancienneAdresse);
@@ -201,6 +207,17 @@ public class UtilisateursService {
         for (int i = 0; i < 8; i++)
             value.append(PASSWORD_CHARS.charAt(RANDOM.nextInt(PASSWORD_CHARS.length())));
         return value.toString();
+    }
+
+    private String normaliserService(String service) {
+        if (service == null || service.isBlank())
+            return null;
+        return service.trim();
+    }
+
+    private void synchroniserServiceContrats(Integer responsableId, String ancienService, String nouveauService) {
+        if (!java.util.Objects.equals(ancienService, nouveauService))
+            contratRepository.updateServiceByResponsableId(responsableId, nouveauService);
     }
 
     @Transactional

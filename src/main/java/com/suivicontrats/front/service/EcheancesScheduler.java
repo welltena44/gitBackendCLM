@@ -7,6 +7,7 @@ import com.suivicontrats.front.repository.ParametresAlertesRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -20,6 +21,7 @@ public class EcheancesScheduler {
     private final JournauxAuditService audit;
 
     @Scheduled(cron = "0 0 7 * * *", zone = "Indian/Antananarivo")
+    @Transactional
     public void notifierEcheances() {
         LocalDate today = LocalDate.now(java.time.ZoneId.of("Indian/Antananarivo"));
         List<ParametresAlertes> rules = alertes.findByActifTrueOrderByJoursAvantAsc();
@@ -46,17 +48,21 @@ public class EcheancesScheduler {
             if (contract.getResponsableId() == null
                     || !List.of("SIGNE", "ACTIF", "APPROUVE").contains(contract.getStatut()))
                 continue;
-            long days = java.time.temporal.ChronoUnit.DAYS.between(today, contract.getDateFin());
+            // L'action doit être déclenchée avant la fin du contrat, à la date limite de préavis.
+            LocalDate dateLimitePreavis = contract.getDateFin().minusDays(
+                    Math.max(0, contract.getJoursPreavis() == null ? 0 : contract.getJoursPreavis()));
+            long days = java.time.temporal.ChronoUnit.DAYS.between(today, dateLimitePreavis);
             for (ParametresAlertes rule : rules) {
                 if (days < 0 || days > rule.getJoursAvant())
                     continue;
                 String nature = Boolean.TRUE.equals(contract.getRenouvellementAutomatique()) ? "renouvellement"
-                        : "fin / résiliation";
+                        : "résiliation ou non-renouvellement";
                 notifications.notifyDeadline(contract.getResponsableId(), contract.getId(), rule.getId(),
-                        "Échéance contractuelle dans " + days + " jours",
-                        "Le contrat " + contract.getReference() + " arrive à échéance le " + contract.getDateFin()
-                                + ". Vérifiez le " + nature + " et le préavis de " + contract.getJoursPreavis()
-                                + " jour(s).");
+                        "Préavis à traiter dans " + days + " jour(s)",
+                        "Le préavis du contrat " + contract.getReference() + " doit être traité au plus tard le "
+                                + dateLimitePreavis + ". Date de fin du contrat : " + contract.getDateFin()
+                                + ". Action à prévoir : " + nature + ". Préavis contractuel : "
+                                + contract.getJoursPreavis() + " jour(s).");
             }
         }
     }

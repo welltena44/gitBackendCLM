@@ -35,6 +35,12 @@ public class DemandesReinitialisationController {
         return service.enAttente((Integer) authentication.getPrincipal());
     }
 
+    @GetMapping("/api/admin/password-reset-requests/history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<DemandeReinitialisationDTO> historique(Authentication authentication) {
+        return service.historique((Integer) authentication.getPrincipal());
+    }
+
     @PostMapping("/api/admin/password-reset-requests/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> approuver(@PathVariable Long id, Authentication authentication) {

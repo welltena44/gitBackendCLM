@@ -104,7 +104,7 @@ class ReglesValidationServiceTest {
     }
 
     @Test
-    void adminActivationNotifiesManagerOfPreviouslyUnmatchedContract() {
+    void adminActivationNotifiesManagerWhenRuleMatchesContract() {
         authenticate("ADMIN");
         ReglesValidation existing = rule(15L, "EN_ATTENTE_CONFIRMATION");
         existing.setMontantMinimum(new BigDecimal("50000000"));
@@ -117,15 +117,34 @@ class ReglesValidationServiceTest {
         when(repository.findById(15L)).thenReturn(Optional.of(existing));
         when(repository.save(any(ReglesValidation.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE"))).thenReturn(List.of(contract));
-        when(repository.findCircuitApplicable(eq(15L), eq(contract.getMontant())))
-                .thenReturn(List.of(), List.of(existing));
+        service.confirm(15L);
+
+        verify(notificationsService).notifyUser(22, 9, "Règle de validation désormais active",
+            "La règle de validation 15 couvre désormais le type de contrat #15 et le montant 75000000 Ar du contrat CON-09. Vous pouvez le soumettre au circuit de validation.",
+                "INFO");
+    }
+
+        @Test
+        void adminActivationDoesNotNotifyManagerAtExclusiveMaximum() {
+        authenticate("ADMIN");
+        ReglesValidation existing = rule(15L, "EN_ATTENTE_CONFIRMATION");
+        existing.setMontantMinimum(new BigDecimal("50000000"));
+        existing.setMontantMaximum(new BigDecimal("75000000"));
+        Contrat contract = new Contrat();
+        contract.setId(9);
+        contract.setReference("CON-09");
+        contract.setTypeId(15L);
+        contract.setMontant(new BigDecimal("75000000"));
+        contract.setResponsableId(22);
+        when(repository.findById(15L)).thenReturn(Optional.of(existing));
+        when(repository.save(any(ReglesValidation.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE"))).thenReturn(List.of(contract));
 
         service.confirm(15L);
 
-        verify(notificationsService).notifyUser(22, 9, "Seuil de validation disponible",
-                "Le seuil de validation du contrat CON-09 est maintenant actif. Vous pouvez le soumettre au circuit de validation.",
-                "INFO");
-    }
+        verify(notificationsService, org.mockito.Mockito.never()).notifyUser(
+            eq(22), eq(9), any(String.class), any(String.class), any(String.class));
+        }
 
     @Test
     void legalCannotCreateWorkflow() {

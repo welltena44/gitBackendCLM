@@ -52,13 +52,12 @@ public class Utilisateurs {
     @Column(name = "utilisateurs_date_creation", nullable = false, updatable = false)
     private LocalDateTime dateCreation;
 
-    @JsonIgnore
-    @Column(name = "utilisateurs_secret_2fa", length = 255)
-    private String secret2fa;
-
-    @Column(name = "utilisateurs_enabled_2fa", nullable = false)
+    @Column(name = "utilisateurs_tentatives_echec", nullable = false)
     @Builder.Default
-    private Boolean enabled2fa = false;
+    private Integer tentativesEchec = 0;
+
+    @Column(name = "utilisateurs_verrouille_jusqua")
+    private LocalDateTime verrouilleJusqua;
 
     @Column(name = "utilisateurs_changement_mot_de_passe_requis", nullable = false)
     @Builder.Default

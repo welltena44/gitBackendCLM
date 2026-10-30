@@ -4,6 +4,7 @@ import com.suivicontrats.front.entity.Contrat;
 import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.DocumentsContratRepository;
+import com.suivicontrats.front.repository.UtilisateursRepository;
 import com.suivicontrats.front.repository.ValidationsRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -16,12 +17,16 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(MockitoExtension.class)
 class ContratServiceTest {
@@ -38,6 +43,8 @@ class ContratServiceTest {
     private ReglesValidationService reglesValidationService;
     @Mock
     private NotificationsService notificationsService;
+    @Mock
+    private UtilisateursRepository utilisateursRepository;
     @InjectMocks
     private ContratService service;
 
@@ -57,6 +64,7 @@ class ContratServiceTest {
         requested.setTypeId(1L);
         requested.setStatut("BROUILLON");
         when(contratRepository.existsByReference("CON-01")).thenReturn(false);
+        when(utilisateursRepository.findById(22)).thenReturn(Optional.of(manager("Gestion")));
         when(contratRepository.save(any(Contrat.class))).thenAnswer(invocation -> {
             Contrat saved = invocation.getArgument(0);
             saved.setId(9);
@@ -66,12 +74,51 @@ class ContratServiceTest {
 
         service.create(requested);
 
-        String message = "Aucune règle active ne couvre le type et le montant du contrat CON-01 (75000000 MGA). "
-                + "Le contrat reste en brouillon jusqu'à la configuration d'un seuil.";
-        verify(notificationsService).notifyContractRole(Utilisateurs.Role.ADMIN, 9,
-                "Aucune règle de validation applicable", message, "INFO");
-        verify(notificationsService).notifyContractRole(Utilisateurs.Role.JURIDIQUE, 9,
-                "Aucune règle de validation applicable", message, "INFO");
+        assertEquals("Gestion", requested.getService());
+        verify(notificationsService).notifyMissingRuleForContract(
+                eq(9), eq("Aucune règle de validation applicable"),
+                contains("type de contrat #1 et le montant 75000000 MGA du contrat CON-01"));
+    }
+
+    @Test
+    void updatesAdminAndLegalAlertsWhenNoRuleMatchesContract() {
+        authenticate();
+        Contrat existing = contract();
+        Contrat details = contract();
+        details.setService("Autre service");
+        when(contratRepository.findById(9)).thenReturn(Optional.of(existing));
+        when(utilisateursRepository.findById(22)).thenReturn(Optional.of(manager("Gestion")));
+        when(contratRepository.save(any(Contrat.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reglesValidationService.getCircuit(eq(1L), any(BigDecimal.class))).thenReturn(List.of());
+
+        service.update(9, details);
+
+        assertEquals("Gestion", existing.getService());
+        verify(notificationsService).notifyMissingRuleForContract(
+                eq(9), eq("Aucune règle de validation applicable"),
+                contains("type de contrat #1 et le montant 75000000 MGA du contrat CON-09"));
+    }
+
+    private Contrat contract() {
+        Contrat contract = new Contrat();
+        contract.setId(9);
+        contract.setReference("CON-09");
+        contract.setObjet("Prestation");
+        contract.setMontant(new BigDecimal("75000000"));
+        contract.setDevise("MGA");
+        contract.setDateDebut(LocalDate.of(2026, 1, 1));
+        contract.setDateFin(LocalDate.of(2027, 1, 1));
+        contract.setStatut("BROUILLON");
+        contract.setResponsableId(22);
+        contract.setTypeId(1L);
+        return contract;
+    }
+
+    private Utilisateurs manager(String service) {
+        Utilisateurs manager = new Utilisateurs();
+        manager.setId(22);
+        manager.setService(service);
+        return manager;
     }
 
     private void authenticate() {

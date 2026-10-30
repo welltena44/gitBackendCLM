@@ -110,6 +110,13 @@ public class ValidationsService {
         Authentication auth = currentAuth();
         if (!valideurId.equals(currentUserId(auth)))
             throw new AccessDeniedException("Décision réservée à l'utilisateur connecté.");
+
+        // Le verrou sur le contrat empêche deux approbations simultanées de perdre
+        // la mise à jour du circuit (notamment lorsque Valideur et Juridique agissent ensemble).
+        Validations validationPourVerrou = validationsRepo.findById(validationId)
+                .orElseThrow(() -> new RuntimeException("Validation non trouvée"));
+        contratRepo.findByIdForUpdate(validationPourVerrou.getContratId())
+                .orElseThrow(() -> new RuntimeException("Contrat non trouvé"));
         if (!List.of("APPROUVE", "REJETE", "MODIFICATION_DEMANDEE").contains(decision)) {
             throw new IllegalArgumentException("Décision de validation invalide");
         }

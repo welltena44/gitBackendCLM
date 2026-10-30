@@ -48,8 +48,8 @@ public class SecurityConfig {
                         }))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/demande-acces",
-                                "/api/auth/password-reset-requests", "/api/auth/session-end")
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login",
+                                "/api/auth/password-reset-requests")
                         .permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/journaux-audit/**", "/api/parametres-alertes/**").hasRole("ADMIN")
