@@ -80,6 +80,7 @@ CREATE TABLE contrats (
     contrats_cree_par                    INTEGER       REFERENCES utilisateurs(utilisateurs_id),
     contrats_date_creation               TIMESTAMP     NOT NULL DEFAULT NOW(),
     contrats_date_modification           TIMESTAMP     NOT NULL DEFAULT NOW(),
+    contrats_date_archivage              TIMESTAMP,
     contrats_version_optimiste            BIGINT        NOT NULL DEFAULT 0,
     CONSTRAINT chk_dates CHECK (contrats_date_fin > contrats_date_debut)
 );
@@ -166,7 +167,9 @@ CREATE TABLE validations (
                      CHECK (validations_decision IN ('EN_ATTENTE', 'A_VENIR', 'NON_REQUISE', 'APPROUVE', 'REJETE', 'MODIFICATION_DEMANDEE')),
     validations_commentaire      TEXT,
     validations_date_soumission  TIMESTAMP   NOT NULL DEFAULT NOW(),
-    validations_date_validation  TIMESTAMP
+    validations_date_validation  TIMESTAMP,
+    validations_date_rappel      TIMESTAMP,
+    validations_date_escalade    TIMESTAMP
 );
 
 CREATE INDEX idx_validations_contract ON validations(validations_contrat_id);
@@ -211,6 +214,25 @@ CREATE TABLE versions_contrat (
 );
 
 -- ---------------------------------------------------------------------
+-- OBLIGATIONS DE FIN DE CONTRAT
+-- ---------------------------------------------------------------------
+CREATE TABLE obligations_contrat (
+    obligations_contrat_id             BIGSERIAL PRIMARY KEY,
+    obligations_contrat_contrat_id     INTEGER       NOT NULL REFERENCES contrats(contrats_id) ON DELETE CASCADE,
+    obligations_contrat_titre          VARCHAR(150)  NOT NULL,
+    obligations_contrat_description    TEXT,
+    obligations_contrat_echeance       DATE,
+    obligations_contrat_statut         VARCHAR(20)   NOT NULL DEFAULT 'EN_COURS'
+                                    CHECK (obligations_contrat_statut IN ('EN_COURS', 'TERMINEE', 'ANNULEE')),
+    obligations_contrat_responsable_id INTEGER       REFERENCES utilisateurs(utilisateurs_id) ON DELETE SET NULL,
+    obligations_contrat_cree_par       INTEGER       REFERENCES utilisateurs(utilisateurs_id) ON DELETE SET NULL,
+    obligations_contrat_date_creation  TIMESTAMP     NOT NULL DEFAULT NOW(),
+    obligations_contrat_date_cloture   TIMESTAMP
+);
+CREATE INDEX idx_obligations_contrat_statut
+    ON obligations_contrat(obligations_contrat_contrat_id, obligations_contrat_statut);
+
+-- ---------------------------------------------------------------------
 -- PARAMETRAGE ALERTES
 -- ---------------------------------------------------------------------
 CREATE TABLE parametres_alertes (
@@ -228,6 +250,7 @@ CREATE TABLE notifications (
     notifications_contrat_id          INTEGER       REFERENCES contrats(contrats_id) ON DELETE CASCADE,
     notifications_regle_validation_id BIGINT        REFERENCES regles_validation(regles_validation_id) ON DELETE SET NULL,
     notifications_parametre_alerte_id BIGINT        REFERENCES parametres_alertes(parametres_alertes_id) ON DELETE SET NULL,
+    notifications_date_echeance       DATE,
     notifications_titre               VARCHAR(150)  NOT NULL,
     notifications_message             VARCHAR(500)  NOT NULL,
     notifications_type                VARCHAR(30)   NOT NULL
@@ -237,8 +260,9 @@ CREATE TABLE notifications (
 );
 CREATE INDEX idx_notifications_user ON notifications(notifications_utilisateur_id, notifications_lu);
 CREATE UNIQUE INDEX uq_notifications_echeance_destinataire
-    ON notifications(notifications_utilisateur_id, notifications_contrat_id, notifications_parametre_alerte_id)
-    WHERE notifications_parametre_alerte_id IS NOT NULL;
+    ON notifications(notifications_utilisateur_id, notifications_contrat_id, notifications_parametre_alerte_id,
+                     notifications_date_echeance)
+    WHERE notifications_parametre_alerte_id IS NOT NULL AND notifications_date_echeance IS NOT NULL;
 
 -- ---------------------------------------------------------------------
 -- AUDIT

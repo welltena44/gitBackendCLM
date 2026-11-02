@@ -51,8 +51,9 @@ public class ValidationsService {
                 .orElseThrow(() -> new RuntimeException("Contrat non trouvé"));
         if (!hasRole(auth, "ADMIN") && !currentUserId(auth).equals(contract.getResponsableId()))
             throw new AccessDeniedException("Ce contrat ne relève pas de votre périmètre.");
-        if (!"BROUILLON".equals(contract.getStatut()) && !"EN_ATTENTE".equals(contract.getStatut()))
-            throw new IllegalArgumentException("Seul un brouillon peut être soumis en validation.");
+        if (!List.of("BROUILLON", "EN_ATTENTE", "REJETE").contains(contract.getStatut()))
+            throw new IllegalArgumentException(
+                    "Seul un brouillon, un contrat en attente ou un contrat rejeté peut être soumis en validation.");
         if (validationsRepo.findByContratId(contratId).stream().anyMatch(v -> "EN_ATTENTE".equals(v.getDecision())))
             throw new IllegalArgumentException("Un circuit de validation est déjà en cours.");
         demandeurId = currentUserId(auth);
@@ -240,12 +241,11 @@ public class ValidationsService {
         String message = "Le contrat " + reference + " attend votre validation de niveau " + validation.getNiveau()
                 + ".";
         if (validation.getValideurId() != null) {
-            notificationsService.notifyUser(validation.getValideurId(), validation.getContratId(), title, message,
-                    "VALIDATION");
+            notificationsService.notifyUserByEmail(validation.getValideurId(), validation.getContratId(), title,
+                message, "VALIDATION");
         } else {
             Utilisateurs.Role role = Utilisateurs.Role.valueOf(validation.getRoleRequis());
-            notificationsService.notifyUsers(utilisateursRepo.findByRoleAndActifTrue(role), validation.getContratId(),
-                    title, message, "VALIDATION");
+            notificationsService.notifyRoleByEmail(role, validation.getContratId(), title, message, "VALIDATION");
         }
     }
 

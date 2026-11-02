@@ -148,6 +148,21 @@ public class EmailService {
         envoyer(destinataire, sujet, contenu);
     }
 
+    public void envoyerEmailNotification(String destinataire, String titre, String message) {
+        String contenu = """
+                Bonjour,
+
+                %s
+
+                %s
+
+                Connectez-vous à SPAT-CLM pour consulter le dossier concerné.
+
+                Administration SPAT-CLM
+                """.formatted(titre, message);
+        envoyer(destinataire, "SPAT-CLM | " + titre, contenu);
+    }
+
     private void envoyer(
             String destinataire,
             String sujet,

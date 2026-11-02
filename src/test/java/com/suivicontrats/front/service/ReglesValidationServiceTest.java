@@ -116,7 +116,8 @@ class ReglesValidationServiceTest {
         contract.setResponsableId(22);
         when(repository.findById(15L)).thenReturn(Optional.of(existing));
         when(repository.save(any(ReglesValidation.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE"))).thenReturn(List.of(contract));
+        when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE", "REJETE")))
+            .thenReturn(List.of(contract));
         service.confirm(15L);
 
         verify(notificationsService).notifyUser(22, 9, "Règle de validation désormais active",
@@ -138,7 +139,8 @@ class ReglesValidationServiceTest {
         contract.setResponsableId(22);
         when(repository.findById(15L)).thenReturn(Optional.of(existing));
         when(repository.save(any(ReglesValidation.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE"))).thenReturn(List.of(contract));
+        when(contratRepository.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE", "REJETE")))
+            .thenReturn(List.of(contract));
 
         service.confirm(15L);
 

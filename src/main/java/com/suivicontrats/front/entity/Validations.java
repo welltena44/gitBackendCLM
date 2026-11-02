@@ -53,4 +53,10 @@ public class Validations {
 
         @Column(name = "validations_date_validation")
         private LocalDateTime dateValidation;
+
+        @Column(name = "validations_date_rappel")
+        private LocalDateTime dateRappel;
+
+        @Column(name = "validations_date_escalade")
+        private LocalDateTime dateEscalade;
 }

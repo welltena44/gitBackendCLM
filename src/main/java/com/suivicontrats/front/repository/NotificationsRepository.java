@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.time.LocalDate;
 import java.util.List;
 
 public interface NotificationsRepository extends JpaRepository<Notifications, Long> {
@@ -18,8 +19,11 @@ public interface NotificationsRepository extends JpaRepository<Notifications, Lo
 
     List<Notifications> findByContratId(Integer contratId);
 
-    boolean existsByUtilisateurIdAndContratIdAndParametreAlerteId(Integer utilisateurId, Integer contratId,
-            Long parametreAlerteId);
+        boolean existsByUtilisateurIdAndContratIdAndParametreAlerteIdAndDateEcheance(Integer utilisateurId,
+            Integer contratId, Long parametreAlerteId, LocalDate dateEcheance);
+
+            boolean existsByUtilisateurIdAndContratIdAndParametreAlerteIdIsNullAndDateEcheanceAndType(
+                Integer utilisateurId, Integer contratId, LocalDate dateEcheance, String type);
 
     @Modifying
     @Query("update Notifications n set n.lu = true where n.utilisateurId = :userId and n.lu = false")

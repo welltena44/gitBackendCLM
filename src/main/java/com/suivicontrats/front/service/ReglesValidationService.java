@@ -96,7 +96,8 @@ public class ReglesValidationService {
             throw new IllegalStateException("Seule une règle dont le seuil est défini peut être confirmée.");
         validateThresholds(rule);
         ensureUniqueLevel(rule, id);
-        List<Contrat> newlyCoveredContracts = contratRepo.findByStatutIn(List.of("BROUILLON", "EN_ATTENTE")).stream()
+        List<Contrat> newlyCoveredContracts = contratRepo
+            .findByStatutIn(List.of("BROUILLON", "EN_ATTENTE", "REJETE")).stream()
             .filter(contract -> contract.getMontant() != null)
             .filter(contract -> rule.getTypeContratId() == null
                 || java.util.Objects.equals(contract.getTypeId(), rule.getTypeContratId()))

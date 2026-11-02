@@ -4,6 +4,7 @@ import com.suivicontrats.front.entity.Contrat;
 import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.DocumentsContratRepository;
+import com.suivicontrats.front.repository.ObligationsContratRepository;
 import com.suivicontrats.front.repository.UtilisateursRepository;
 import com.suivicontrats.front.repository.ValidationsRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class ContratServiceTest {
@@ -45,6 +47,8 @@ class ContratServiceTest {
     private NotificationsService notificationsService;
     @Mock
     private UtilisateursRepository utilisateursRepository;
+    @Mock
+    private ObligationsContratRepository obligationsContratRepository;
     @InjectMocks
     private ContratService service;
 
@@ -97,6 +101,36 @@ class ContratServiceTest {
         verify(notificationsService).notifyMissingRuleForContract(
                 eq(9), eq("Aucune règle de validation applicable"),
                 contains("type de contrat #1 et le montant 75000000 MGA du contrat CON-09"));
+    }
+
+    @Test
+    void managerCanEditRejectedContractWithoutChangingItsStatus() {
+        authenticate();
+        Contrat existing = contract();
+        existing.setStatut("REJETE");
+        Contrat details = contract();
+        details.setStatut("REJETE");
+        details.setObjet("Prestation corrigée");
+        when(contratRepository.findById(9)).thenReturn(Optional.of(existing));
+        when(utilisateursRepository.findById(22)).thenReturn(Optional.of(manager("Gestion")));
+        when(contratRepository.save(any(Contrat.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reglesValidationService.getCircuit(eq(1L), any(BigDecimal.class))).thenReturn(List.of());
+
+        Contrat updated = service.update(9, details);
+
+        assertEquals("Prestation corrigée", updated.getObjet());
+        assertEquals("REJETE", updated.getStatut());
+    }
+
+    @Test
+    void cannotTerminateContractWithOpenObligations() {
+        authenticate();
+        Contrat existing = contract();
+        existing.setStatut("ACTIF");
+        when(contratRepository.findById(9)).thenReturn(Optional.of(existing));
+        when(obligationsContratRepository.existsByContratIdAndStatut(9, "EN_COURS")).thenReturn(true);
+
+        assertThrows(IllegalStateException.class, () -> service.terminate(9));
     }
 
     private Contrat contract() {

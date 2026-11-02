@@ -1,6 +1,7 @@
 package com.suivicontrats.front.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDate;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -25,6 +26,9 @@ public class Notifications {
 
     @Column(name = "notifications_parametre_alerte_id")
     private Long parametreAlerteId;
+
+    @Column(name = "notifications_date_echeance")
+    private LocalDate dateEcheance;
 
     @Column(name = "notifications_regle_validation_id")
     private Long regleValidationId;

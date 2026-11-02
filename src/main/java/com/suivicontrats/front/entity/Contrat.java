@@ -78,6 +78,9 @@ public class Contrat {
     @Column(name = "contrats_date_modification", nullable = false)
     private LocalDateTime dateModification;
 
+    @Column(name = "contrats_date_archivage")
+    private LocalDateTime dateArchivage;
+
     // Verrouillage optimiste : empêche un formulaire ancien d'écraser une mise à jour récente.
     @Version
     @Column(name = "contrats_version_optimiste", nullable = false)
@@ -255,5 +258,13 @@ public class Contrat {
 
     public void setDateModification(LocalDateTime dateModification) {
         this.dateModification = dateModification;
+    }
+
+    public LocalDateTime getDateArchivage() {
+        return dateArchivage;
+    }
+
+    public void setDateArchivage(LocalDateTime dateArchivage) {
+        this.dateArchivage = dateArchivage;
     }
 }

@@ -4,20 +4,25 @@ import com.suivicontrats.front.entity.Notifications;
 import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.NotificationsRepository;
 import com.suivicontrats.front.repository.UtilisateursRepository;
+import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.mail.MailException;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class NotificationsService {
 
     private final NotificationsRepository repo;
     private final UtilisateursRepository utilisateursRepo;
+    private final EmailService emailService;
 
     public List<Notifications> all() {
         requireAdmin();
@@ -113,6 +118,26 @@ public class NotificationsService {
                 .forEach(id -> saveForUser(id, contractId, title, message, type));
     }
 
+    @Transactional
+    public void notifyUserByEmail(Integer userId, Integer contractId, String title, String message, String type) {
+        if (userId == null)
+            return;
+        saveForUser(userId, contractId, title, message, type);
+        sendEmail(userId, title, message);
+    }
+
+    @Transactional
+    public void notifyRoleByEmail(Utilisateurs.Role role, Integer contractId, String title, String message,
+            String type) {
+        List<Utilisateurs> users = utilisateursRepo.findByRoleAndActifTrue(role);
+        if (users == null || users.isEmpty())
+            return;
+        users.stream().map(Utilisateurs::getId).filter(java.util.Objects::nonNull).distinct().forEach(userId -> {
+            saveForUser(userId, contractId, title, message, type);
+            sendEmail(userId, title, message);
+        });
+    }
+
     public Notifications update(Long id, Notifications details) {
         requireAdmin();
         Notifications notification = getOne(id);
@@ -140,22 +165,50 @@ public class NotificationsService {
     }
 
     @Transactional
-    public void notifyDeadline(Integer userId, Integer contractId, Long parameterId, String title, String message) {
+    public void notifyDeadline(Integer userId, Integer contractId, Long parameterId, LocalDate deadline,
+            String title, String message) {
         if (userId != null)
-            saveDeadlineForUser(userId, contractId, parameterId, title, message);
+            saveDeadlineForUser(userId, contractId, parameterId, deadline, title, message, "ECHEANCE");
     }
 
-    private void saveDeadlineForUser(Integer userId, Integer contractId, Long parameterId, String title,
-            String message) {
-        if (repo.existsByUtilisateurIdAndContratIdAndParametreAlerteId(userId, contractId, parameterId))
+    private void saveDeadlineForUser(Integer userId, Integer contractId, Long parameterId, LocalDate deadline,
+            String title, String message, String type) {
+        boolean alreadySent = parameterId == null
+            ? repo.existsByUtilisateurIdAndContratIdAndParametreAlerteIdIsNullAndDateEcheanceAndType(
+                userId, contractId, deadline, type)
+            : repo.existsByUtilisateurIdAndContratIdAndParametreAlerteIdAndDateEcheance(
+                userId, contractId, parameterId, deadline);
+        if (alreadySent)
             return;
         try {
             repo.save(Notifications.builder().utilisateurId(userId).contratId(contractId)
-                    .parametreAlerteId(parameterId).titre(truncate(title, 150)).message(truncate(message, 500))
-                    .type("ECHEANCE").lu(false).build());
+                    .parametreAlerteId(parameterId).dateEcheance(deadline)
+                    .titre(truncate(title, 150)).message(truncate(message, 500))
+                .type(type).lu(false).build());
+            sendEmail(userId, title, message);
         } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
             // Un autre nœud a pu enregistrer cette même alerte au même instant.
         }
+    }
+
+    @Transactional
+    public void notifyLifecycleDate(Integer userId, Integer contractId, LocalDate deadline, String title,
+            String message, String type) {
+        if (userId != null)
+            saveDeadlineForUser(userId, contractId, null, deadline, title, message, type);
+    }
+
+    private void sendEmail(Integer userId, String title, String message) {
+        utilisateursRepo.findById(userId).ifPresent(user -> {
+            String name = java.util.stream.Stream.of(user.getPrenom(), user.getNom())
+                    .filter(value -> value != null && !value.isBlank())
+                    .collect(java.util.stream.Collectors.joining(" "));
+            try {
+                emailService.envoyerEmailNotification(user.getEmail(), title, message);
+            } catch (MailException failure) {
+                log.warn("Notification e-mail non envoyée à {} : {}", name, failure.getMessage());
+            }
+        });
     }
 
     public void delete(Long id) {
