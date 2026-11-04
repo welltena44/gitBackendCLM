@@ -8,4 +8,6 @@ public interface TypesContratRepository extends JpaRepository<TypesContrat, Long
     List<TypesContrat> findByActifTrue();
 
     List<TypesContrat> findAllByOrderByNomAsc();
+
+    boolean existsByNomIgnoreCase(String nom);
 }

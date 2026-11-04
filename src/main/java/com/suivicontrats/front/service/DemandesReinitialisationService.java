@@ -16,6 +16,7 @@ public class DemandesReinitialisationService {
     private final DemandesReinitialisationMotDePasseRepository demandesRepository;
     private final UtilisateursRepository utilisateursRepository;
     private final UtilisateursService utilisateursService;
+    private final JournauxAuditService auditService;
 
     @Transactional
     public void soumettre(Integer matricule) {
@@ -61,6 +62,7 @@ public class DemandesReinitialisationService {
         utilisateursService.reinitialiserMotDePasse(demande.getUtilisateur().getId());
         demande.setStatut(DemandesReinitialisationMotDePasse.Statut.APPROUVEE);
         demandesRepository.save(demande);
+        auditService.record(adminId, null, null, "DEMANDE_MOT_DE_PASSE_APPROUVEE", "statut=EN_ATTENTE", "demandeId=" + demandeId + "; statut=APPROUVEE");
     }
 
     @Transactional
@@ -69,6 +71,7 @@ public class DemandesReinitialisationService {
         DemandesReinitialisationMotDePasse demande = demandeEnAttente(demandeId);
         demande.setStatut(DemandesReinitialisationMotDePasse.Statut.REJETEE);
         demandesRepository.save(demande);
+        auditService.record(adminId, null, null, "DEMANDE_MOT_DE_PASSE_REJETEE", "statut=EN_ATTENTE", "demandeId=" + demandeId + "; statut=REJETEE");
     }
 
     private DemandesReinitialisationMotDePasse demandeEnAttente(Long id) {

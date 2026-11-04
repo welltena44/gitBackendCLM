@@ -27,6 +27,10 @@ public interface ContratRepository extends JpaRepository<Contrat, Integer> {
 
     boolean existsByReference(String reference);
 
+    boolean existsByTypeId(Long typeId);
+
+    boolean existsByResponsableId(Integer responsableId);
+
     @Modifying
     @Query("update Contrat c set c.service = :service where c.responsableId = :responsableId")
     int updateServiceByResponsableId(

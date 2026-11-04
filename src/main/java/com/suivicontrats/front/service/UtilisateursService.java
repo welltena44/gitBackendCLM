@@ -6,6 +6,10 @@ import com.suivicontrats.front.dto.ProfilRequest;
 import com.suivicontrats.front.dto.UtilisateursDTO;
 import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.UtilisateursRepository;
+import com.suivicontrats.front.repository.ValidationsRepository;
+import com.suivicontrats.front.repository.DemandesReinitialisationMotDePasseRepository;
+import com.suivicontrats.front.entity.DemandesReinitialisationMotDePasse;
+import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,6 +28,9 @@ public class UtilisateursService {
     private final ContratRepository contratRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final ValidationsRepository validationsRepository;
+    private final DemandesReinitialisationMotDePasseRepository demandesRepository;
+    private final JournauxAuditService auditService;
 
     @Transactional(readOnly = true)
     public List<Utilisateurs> all() {
@@ -40,10 +47,7 @@ public class UtilisateursService {
     public Utilisateurs create(Utilisateurs utilisateur) {
         utilisateur.setId(null);
 
-        if (utilisateur.getMatricule() == null) {
-            throw new IllegalArgumentException(
-                    "Le matricule est obligatoire");
-        }
+        validerUtilisateur(utilisateur, null);
 
         String motDePasseClair = genererMotDePasse();
         utilisateur.setMotDePasse(
@@ -51,6 +55,7 @@ public class UtilisateursService {
         utilisateur.setChangementMotDePasseRequis(true);
 
         Utilisateurs savedUser = repository.save(utilisateur);
+        audit("UTILISATEUR_CREE", null, "id=" + savedUser.getId() + "; matricule=" + savedUser.getMatricule() + "; role=" + savedUser.getRole());
 
         emailService.envoyerEmailCreationCompte(
                 savedUser.getEmail(),
@@ -104,6 +109,11 @@ public class UtilisateursService {
     @Transactional
     public Utilisateurs update(Integer id, Utilisateurs details) {
         Utilisateurs utilisateur = getOne(id);
+        validerUtilisateur(details, id);
+        protegerDernierAdmin(utilisateur, details.getRole(), details.getActif());
+        if (details.getActif() != null && !details.getActif() && id.equals(currentUserId()))
+            throw new IllegalArgumentException("Vous ne pouvez pas désactiver votre propre compte.");
+        String ancienneDescription = "matricule=" + utilisateur.getMatricule() + "; role=" + utilisateur.getRole() + "; actif=" + utilisateur.getActif();
 
         // Conserver l'ancien hash avant toute modification.
         String ancienHash = utilisateur.getMotDePasse();
@@ -161,6 +171,7 @@ public class UtilisateursService {
 
         Utilisateurs savedUser = repository.save(utilisateur);
         synchroniserServiceContrats(id, ancienService, savedUser.getService());
+        audit("UTILISATEUR_MODIFIE", ancienneDescription, "matricule=" + savedUser.getMatricule() + "; role=" + savedUser.getRole() + "; actif=" + savedUser.getActif());
 
         boolean adresseModifiee = details.getEmail() != null
                 && !details.getEmail().equalsIgnoreCase(ancienneAdresse);
@@ -226,7 +237,10 @@ public class UtilisateursService {
         String motDePasseProvisoire = genererMotDePasse();
         utilisateur.setMotDePasse(passwordEncoder.encode(motDePasseProvisoire));
         utilisateur.setChangementMotDePasseRequis(true);
+        utilisateur.setTentativesEchec(0);
+        utilisateur.setVerrouilleJusqua(null);
         repository.save(utilisateur);
+        audit("MOT_DE_PASSE_REINITIALISE", null, "utilisateurId=" + id);
         emailService.envoyerEmailModificationMotDePasse(
                 utilisateur.getEmail(), nomComplet(utilisateur), motDePasseProvisoire);
     }
@@ -243,13 +257,51 @@ public class UtilisateursService {
     @Transactional
     public void delete(Integer id) {
         Utilisateurs utilisateur = getOne(id);
+        if (id.equals(currentUserId())) throw new IllegalArgumentException("Vous ne pouvez pas supprimer votre propre compte.");
+        if (utilisateur.getRole() == Utilisateurs.Role.ADMIN && Boolean.TRUE.equals(utilisateur.getActif())
+                && repository.countByRoleAndActifTrue(Utilisateurs.Role.ADMIN) <= 1)
+            throw new IllegalArgumentException("Impossible de supprimer le dernier administrateur actif.");
+        if (contratRepository.existsByResponsableId(id) || validationsRepository.existsByValideurId(id)
+                || demandesRepository.existsByUtilisateur_Id(id))
+            throw new IllegalArgumentException("Cet utilisateur est encore référencé par des contrats, validations ou demandes. Désactivez son compte au lieu de le supprimer.");
 
         emailService.envoyerEmailSuppressionCompte(
                 utilisateur.getEmail(),
                 nomComplet(utilisateur));
 
         repository.delete(utilisateur);
+        audit("UTILISATEUR_SUPPRIME", "id=" + id + "; matricule=" + utilisateur.getMatricule(), null);
     }
+
+    @Transactional(readOnly = true)
+    public List<Utilisateurs> comptesVerrouilles() {
+        return repository.findByVerrouilleJusquaAfter(java.time.LocalDateTime.now());
+    }
+
+    @Transactional
+    public void deverrouiller(Integer id) {
+        Utilisateurs u = getOne(id);
+        u.setTentativesEchec(0); u.setVerrouilleJusqua(null); repository.save(u);
+        audit("COMPTE_DEVERROUILLE", null, "utilisateurId=" + id);
+    }
+
+    private void validerUtilisateur(Utilisateurs u, Integer excludeId) {
+        if (u.getMatricule() == null || u.getMatricule() <= 0) throw new IllegalArgumentException("Le matricule doit être un entier positif.");
+        if (repository.findByMatricule(u.getMatricule()).filter(x -> !x.getId().equals(excludeId)).isPresent()) throw new IllegalArgumentException("Ce matricule est déjà utilisé.");
+        if (u.getEmail() == null || !u.getEmail().trim().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) throw new IllegalArgumentException("Veuillez saisir une adresse e-mail valide.");
+        if (repository.findByEmailIgnoreCase(u.getEmail().trim()).filter(x -> !x.getId().equals(excludeId)).isPresent()) throw new IllegalArgumentException("Cette adresse e-mail est déjà utilisée.");
+        if (u.getRole() == null) throw new IllegalArgumentException("Le rôle de l'utilisateur est obligatoire.");
+        if (u.getNom() == null || u.getNom().isBlank() || u.getPrenom() == null || u.getPrenom().isBlank()) throw new IllegalArgumentException("Le nom et le prénom sont obligatoires.");
+    }
+
+    private void protegerDernierAdmin(Utilisateurs current, Utilisateurs.Role nextRole, Boolean nextActive) {
+        boolean adminActif = current.getRole() == Utilisateurs.Role.ADMIN && Boolean.TRUE.equals(current.getActif());
+        boolean resteAdmin = nextRole == Utilisateurs.Role.ADMIN && (nextActive == null || nextActive);
+        if (adminActif && !resteAdmin && repository.countByRoleAndActifTrue(Utilisateurs.Role.ADMIN) <= 1)
+            throw new IllegalArgumentException("Impossible de désactiver ou rétrograder le dernier administrateur actif.");
+    }
+    private Integer currentUserId() { Object p=SecurityContextHolder.getContext().getAuthentication()==null?null:SecurityContextHolder.getContext().getAuthentication().getPrincipal(); return p instanceof Integer?(Integer)p:null; }
+    private void audit(String action,String oldValue,String newValue) { auditService.record(currentUserId(),null,null,action,oldValue,newValue); }
 
     private String nomComplet(Utilisateurs utilisateur) {
         return utilisateur.getPrenom() + " " + utilisateur.getNom();

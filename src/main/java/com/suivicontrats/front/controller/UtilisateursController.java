@@ -66,6 +66,19 @@ public class UtilisateursController {
         return ResponseEntity.ok(service.update(id, utilisateur));
     }
 
+
+    @GetMapping("/verrouilles")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Utilisateurs>> locked() { return ResponseEntity.ok(service.comptesVerrouilles()); }
+
+    @PostMapping("/{id}/reinitialiser-mot-de-passe")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> resetPassword(@PathVariable Integer id) { service.reinitialiserMotDePasse(id); return ResponseEntity.noContent().build(); }
+
+    @PostMapping("/{id}/deverrouiller")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> unlock(@PathVariable Integer id) { service.deverrouiller(id); return ResponseEntity.noContent().build(); }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {

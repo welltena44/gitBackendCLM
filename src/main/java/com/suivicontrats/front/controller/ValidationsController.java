@@ -38,6 +38,14 @@ public class ValidationsController {
         return service.genererCircuit(contratId, demandeurId);
     }
 
+    @PostMapping("/{id}/reattribuer")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Validations reattribuer(@PathVariable Long id, @RequestBody Map<String, Integer> body) {
+        Integer nouveauValideurId = body.get("valideurId");
+        if (nouveauValideurId == null) throw new IllegalArgumentException("Le matricule technique du nouveau valideur est obligatoire.");
+        return service.reattribuer(id, nouveauValideurId);
+    }
+
     @PostMapping("/{id}/decider")
     @PreAuthorize("hasAnyRole('VALIDEUR','JURIDIQUE')")
     public Validations decider(@PathVariable Long id, @RequestBody Map<String, Object> body,

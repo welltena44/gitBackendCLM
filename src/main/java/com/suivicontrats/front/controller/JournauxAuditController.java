@@ -6,6 +6,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
 import java.util.List;
+import java.time.LocalDateTime;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/journaux-audit")
@@ -18,6 +22,19 @@ public class JournauxAuditController {
     @PreAuthorize("hasRole('ADMIN')")
     public List<JournauxAudit> all() {
         return service.all();
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Page<JournauxAudit> page(
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) LocalDateTime fromDate,
+            @RequestParam(required = false) LocalDateTime toDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        if (page < 0 || size < 1 || size > 100) throw new IllegalArgumentException("Pagination invalide (taille maximale : 100).");
+        return service.search(userId, action, fromDate, toDate, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "dateAction")));
     }
 
     @GetMapping("/{id}")

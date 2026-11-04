@@ -23,6 +23,7 @@ public class ReglesValidationService {
     private final ContratRepository contratRepo;
     private final UtilisateursRepository utilisateursRepo;
     private final NotificationsService notificationsService;
+    private final JournauxAuditService auditService;
 
     public List<ReglesValidation> getAll() {
         return repo.findAllByOrderByNiveauAsc();
@@ -39,14 +40,14 @@ public class ReglesValidationService {
     @Transactional
     public ReglesValidation create(ReglesValidation r) {
         requireAdmin();
-        if (r.getTypeContratId() == null)
-            throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
+        // typeContratId NULL représente volontairement une règle globale « Tous types ».
         validateWorkflow(r);
         r.setId(null);
         r.setMontantMinimum(BigDecimal.ZERO);
         r.setMontantMaximum(null);
         r.setStatut("EN_ATTENTE_SEUIL");
         ReglesValidation saved = repo.save(r);
+        auditAction("REGLE_VALIDATION_CREEE", null, description(saved));
         notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
                 saved.getId(), "Circuit de validation à compléter",
                 "L’ADMIN a créé une règle de niveau " + saved.getNiveau() + ". Définissez son seuil financier.");
@@ -59,10 +60,12 @@ public class ReglesValidationService {
         ReglesValidation existing = getOne(id);
         if (hasRole(auth, "JURIDIQUE")) {
             validateThresholds(r);
+            String old = description(existing);
             existing.setMontantMinimum(r.getMontantMinimum());
             existing.setMontantMaximum(r.getMontantMaximum());
             existing.setStatut("EN_ATTENTE_CONFIRMATION");
             ReglesValidation saved = repo.save(existing);
+            auditAction("SEUIL_REGLE_MODIFIE", old, description(saved));
             notificationsService.notifyRuleRole(Utilisateurs.Role.ADMIN,
                     saved.getId(), "Seuil de validation à confirmer",
                     "Le Juridique a défini le seuil de la règle de niveau " + saved.getNiveau()
@@ -70,8 +73,8 @@ public class ReglesValidationService {
             return saved;
         } else {
             validateWorkflow(r);
-            if (r.getTypeContratId() == null)
-                throw new IllegalArgumentException("Sélectionnez un type de contrat pour cette règle.");
+            String old = description(existing);
+            // NULL est autorisé : l'administrateur peut configurer une règle globale.
             existing.setTypeContratId(r.getTypeContratId());
             existing.setNiveau(r.getNiveau());
             existing.setRoleRequis(r.getRoleRequis());
@@ -80,6 +83,7 @@ public class ReglesValidationService {
             existing.setMontantMaximum(null);
             existing.setStatut("EN_ATTENTE_SEUIL");
             ReglesValidation saved = repo.save(existing);
+            auditAction("REGLE_VALIDATION_MODIFIEE", old, description(saved));
             notificationsService.notifyRuleRole(Utilisateurs.Role.JURIDIQUE,
                     saved.getId(), "Circuit de validation modifié",
                     "L’ADMIN a modifié une règle de niveau " + saved.getNiveau()
@@ -108,6 +112,7 @@ public class ReglesValidationService {
                 .toList();
         rule.setStatut("ACTIVE");
         ReglesValidation saved = repo.save(rule);
+        auditAction("REGLE_VALIDATION_CONFIRMEE", description(rule), description(saved));
         newlyCoveredContracts.stream()
                 .forEach(contract -> notificationsService.notifyUser(contract.getResponsableId(), contract.getId(),
                 "Règle de validation désormais active",
@@ -147,18 +152,29 @@ public class ReglesValidationService {
     }
 
     private void ensureUniqueLevel(ReglesValidation candidate, Long excludedId) {
-        boolean duplicate = repo.findAll().stream()
+        boolean overlap = repo.findAll().stream()
                 .filter(existing -> excludedId == null || !excludedId.equals(existing.getId()))
                 .filter(existing -> "ACTIVE".equals(existing.getStatut())
                         || "EN_ATTENTE_CONFIRMATION".equals(existing.getStatut()))
-                .anyMatch(
-                        existing -> java.util.Objects.equals(existing.getTypeContratId(), candidate.getTypeContratId())
-                                && sameAmount(existing.getMontantMinimum(), candidate.getMontantMinimum())
-                                && sameAmount(existing.getMontantMaximum(), candidate.getMontantMaximum())
-                                && java.util.Objects.equals(existing.getNiveau(), candidate.getNiveau())
-                                && overlapsRoles(existing.getRoleRequis(), candidate.getRoleRequis()));
-        if (duplicate)
-            throw new IllegalArgumentException("Ce seuil possède déjà une étape pour ce rôle à ce niveau.");
+                .filter(existing -> java.util.Objects.equals(existing.getTypeContratId(), candidate.getTypeContratId()))
+                .filter(existing -> java.util.Objects.equals(existing.getNiveau(), candidate.getNiveau()))
+                .filter(existing -> overlapsRoles(existing.getRoleRequis(), candidate.getRoleRequis()))
+                .anyMatch(existing -> tranchesSeChevauchent(
+                        existing.getMontantMinimum(), existing.getMontantMaximum(),
+                        candidate.getMontantMinimum(), candidate.getMontantMaximum()));
+        if (overlap) {
+            throw new IllegalArgumentException(
+                    "Cette tranche de montants chevauche une autre règle active ou en attente pour le même type, niveau et rôle.");
+        }
+    }
+
+    /** Les bornes sont [minimum, maximum[ ; un maximum NULL signifie +infini. */
+    private boolean tranchesSeChevauchent(BigDecimal minA, BigDecimal maxA, BigDecimal minB, BigDecimal maxB) {
+        BigDecimal aMin = minA == null ? BigDecimal.ZERO : minA;
+        BigDecimal bMin = minB == null ? BigDecimal.ZERO : minB;
+        boolean aAvantFinB = maxB == null || aMin.compareTo(maxB) < 0;
+        boolean bAvantFinA = maxA == null || bMin.compareTo(maxA) < 0;
+        return aAvantFinB && bAvantFinA;
     }
 
     private boolean overlapsRoles(String first, String second) {
@@ -180,7 +196,23 @@ public class ReglesValidationService {
         if (!hasRole(auth, "ADMIN")) {
             throw new AccessDeniedException("La suppression d'une étape de circuit est réservée à l'administrateur.");
         }
-        repo.deleteById(id);
+        ReglesValidation rule = getOne(id);
+        if ("ACTIVE".equals(rule.getStatut()) || "EN_ATTENTE_CONFIRMATION".equals(rule.getStatut())) {
+            throw new IllegalArgumentException("Une règle active ou en attente ne peut pas être supprimée. Désactivez-la selon le circuit de gestion prévu.");
+        }
+        repo.delete(rule);
+        auditAction("REGLE_VALIDATION_SUPPRIMEE", description(rule), null);
+    }
+
+    private String description(ReglesValidation r) {
+        return "id=" + r.getId() + "; type=" + (r.getTypeContratId() == null ? "GLOBAL" : r.getTypeContratId())
+                + "; niveau=" + r.getNiveau() + "; role=" + r.getRoleRequis() + "; minimum=" + r.getMontantMinimum()
+                + "; maximum=" + r.getMontantMaximum() + "; statut=" + r.getStatut();
+    }
+    private void auditAction(String action, String oldValue, String newValue) {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        Integer actor = a != null && a.getPrincipal() instanceof Integer ? (Integer) a.getPrincipal() : null;
+        auditService.record(actor, null, null, action, oldValue, newValue);
     }
 
     private Authentication requireAdmin() {

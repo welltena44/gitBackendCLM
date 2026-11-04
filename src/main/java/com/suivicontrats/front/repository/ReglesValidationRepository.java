@@ -13,6 +13,8 @@ public interface ReglesValidationRepository extends JpaRepository<ReglesValidati
 
     List<ReglesValidation> findAllByOrderByNiveauAsc();
 
+    boolean existsByTypeContratId(Long typeContratId);
+
     // Ta logique métier : montant_minimum <= montant < montant_maximum
     @Query("SELECT r FROM ReglesValidation r WHERE " +
             "(r.typeContratId = :typeId OR r.typeContratId IS NULL) AND " +

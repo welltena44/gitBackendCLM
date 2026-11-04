@@ -10,4 +10,10 @@ public interface UtilisateursRepository extends JpaRepository<Utilisateurs, Inte
     boolean existsByEmailIgnoreCase(String email);
     java.util.List<Utilisateurs> findByRoleAndActifTrue(Utilisateurs.Role role);
     java.util.List<Utilisateurs> findByActifTrue();
+
+    boolean existsByMatricule(Integer matricule);
+
+    java.util.List<Utilisateurs> findByVerrouilleJusquaAfter(java.time.LocalDateTime date);
+
+    long countByRoleAndActifTrue(Utilisateurs.Role role);
 }

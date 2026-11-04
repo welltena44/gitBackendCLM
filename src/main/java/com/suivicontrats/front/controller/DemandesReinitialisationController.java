@@ -44,22 +44,14 @@ public class DemandesReinitialisationController {
     @PostMapping("/api/admin/password-reset-requests/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> approuver(@PathVariable Long id, Authentication authentication) {
-        try {
-            service.approuver(id, (Integer) authentication.getPrincipal());
-            return ResponseEntity.ok(Map.of("message", "Mot de passe réinitialisé et envoyé par e-mail."));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
-        }
+        service.approuver(id, (Integer) authentication.getPrincipal());
+        return ResponseEntity.ok(Map.of("message", "Mot de passe réinitialisé et envoyé par e-mail."));
     }
 
     @PostMapping("/api/admin/password-reset-requests/{id}/reject")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> rejeter(@PathVariable Long id, Authentication authentication) {
-        try {
-            service.rejeter(id, (Integer) authentication.getPrincipal());
-            return ResponseEntity.ok(Map.of("message", "Demande rejetée."));
-        } catch (SecurityException e) {
-            return ResponseEntity.status(403).body(Map.of("message", e.getMessage()));
-        }
+        service.rejeter(id, (Integer) authentication.getPrincipal());
+        return ResponseEntity.ok(Map.of("message", "Demande rejetée."));
     }
 }

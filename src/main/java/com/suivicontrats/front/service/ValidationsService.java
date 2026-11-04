@@ -48,6 +48,29 @@ public class ValidationsService {
         return validationsRepo.findByDecision("EN_ATTENTE");
     }
 
+    /** Réattribution administrative d'une étape active sans modifier la décision métier. */
+    @Transactional
+    public Validations reattribuer(Long validationId, Integer nouveauValideurId) {
+        Authentication auth = currentAuth();
+        if (!hasRole(auth, "ADMIN")) throw new AccessDeniedException("Seul l'administrateur peut réattribuer une validation.");
+        Validations validation = validationsRepo.findById(validationId)
+                .orElseThrow(() -> new IllegalArgumentException("Validation introuvable."));
+        if (!"EN_ATTENTE".equals(validation.getDecision()))
+            throw new IllegalArgumentException("Seule une étape actuellement en attente peut être réattribuée.");
+        Utilisateurs user = utilisateursRepo.findById(nouveauValideurId)
+                .orElseThrow(() -> new IllegalArgumentException("Le valideur sélectionné n'existe pas."));
+        if (!Boolean.TRUE.equals(user.getActif()) || !user.getRole().name().equals(validation.getRoleRequis()))
+            throw new IllegalArgumentException("Le nouvel attributaire doit être actif et posséder le rôle " + validation.getRoleRequis() + ".");
+        Integer ancien = validation.getValideurId();
+        validation.setValideurId(nouveauValideurId);
+        Validations saved = validationsRepo.save(validation);
+        notificationsService.notifyUser(nouveauValideurId, validation.getContratId(),
+                "Validation qui vous est attribuée", "L'administrateur vous a attribué l'étape " + validation.getNiveau() + " du circuit de validation.", "VALIDATION");
+        journauxAuditService.record(currentUserId(auth), validation.getContratId(), null, "VALIDATION_REATTRIBUEE",
+                "valideurId=" + ancien, "valideurId=" + nouveauValideurId + "; validationId=" + validationId);
+        return saved;
+    }
+
     @Transactional
     public List<Validations> genererCircuit(Integer contratId, Integer demandeurId) {
         Authentication auth = currentAuth();

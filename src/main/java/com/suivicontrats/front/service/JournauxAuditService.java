@@ -5,6 +5,9 @@ import com.suivicontrats.front.repository.JournauxAuditRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -14,6 +17,13 @@ public class JournauxAuditService {
 
     public List<JournauxAudit> all() {
         return repo.findAllByOrderByDateActionDesc();
+    }
+
+    public Page<JournauxAudit> search(Integer userId, String action, LocalDateTime fromDate, LocalDateTime toDate, Pageable pageable) {
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate))
+            throw new IllegalArgumentException("La date de début doit précéder la date de fin.");
+        String normalizedAction = action == null || action.isBlank() ? null : action.trim();
+        return repo.search(userId, normalizedAction, fromDate, toDate, pageable);
     }
 
     public JournauxAudit getOne(Long id) {

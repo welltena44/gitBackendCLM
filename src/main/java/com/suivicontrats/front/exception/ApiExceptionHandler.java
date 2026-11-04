@@ -4,9 +4,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.MailException;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,11 +19,32 @@ import java.util.Map;
 @RestControllerAdvice
 public class ApiExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException ex) {
+        log.warn("Contrainte de base de données violée", ex);
+        String detail = (ex.getMostSpecificCause() == null ? "" : String.valueOf(ex.getMostSpecificCause().getMessage())).toLowerCase(java.util.Locale.ROOT);
+        if (detail.contains("unique") || detail.contains("duplicate") || detail.contains("already exists"))
+            return response(HttpStatus.CONFLICT, "Cette valeur existe déjà. Vérifiez les matricules, adresses e-mail, noms et délais déjà enregistrés.");
+        if (detail.contains("foreign key") || detail.contains("violates foreign key") || detail.contains("constraint"))
+            return response(HttpStatus.CONFLICT, "Cette opération est impossible : l'élément est encore utilisé par d'autres données. Désactivez-le plutôt que de le supprimer.");
+        return response(HttpStatus.CONFLICT, "L'opération viole une contrainte de cohérence des données.");
+    }
+
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, Object>> database(DataAccessException ex) {
         log.error("Erreur d'accès à la base de données", ex);
         return response(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Une erreur interne est survenue lors du traitement des données.");
+    }
+
+    @ExceptionHandler(LockedException.class)
+    public ResponseEntity<Map<String, Object>> locked(LockedException ex) {
+        return response(HttpStatus.LOCKED, safeMessage(ex.getMessage(), "Compte temporairement verrouillé."));
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<Map<String, Object>> security(SecurityException ex) {
+        return response(HttpStatus.FORBIDDEN, safeMessage(ex.getMessage(), "Accès interdit."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

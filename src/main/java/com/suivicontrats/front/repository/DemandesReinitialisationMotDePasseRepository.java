@@ -12,6 +12,8 @@ public interface DemandesReinitialisationMotDePasseRepository
 
         List<DemandesReinitialisationMotDePasse> findAllByOrderByDateCreationDesc();
 
+        boolean existsByUtilisateur_Id(Integer utilisateurId);
+
         Optional<DemandesReinitialisationMotDePasse> findFirstByUtilisateur_IdAndStatut(
                         Integer utilisateurId, DemandesReinitialisationMotDePasse.Statut statut);
 }
