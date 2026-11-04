@@ -11,4 +11,7 @@ public interface ValidationsRepository extends JpaRepository<Validations, Long> 
     List<Validations> findByValideurIdIsNullAndRoleRequis(String roleRequis);
     java.util.Optional<Validations> findTopByContratIdOrderByCycleDesc(Integer contratId);
     List<Validations> findByContratIdAndCycleOrderByNiveauAsc(Integer contratId, Integer cycle);
+    List<Validations> findByAvenantIdAndCycleOrderByNiveauAsc(Long avenantId, Integer cycle);
+    java.util.Optional<Validations> findTopByAvenantIdOrderByCycleDesc(Long avenantId);
+    boolean existsByAvenantIdAndDecisionIn(Long avenantId, java.util.Collection<String> decisions);
 }

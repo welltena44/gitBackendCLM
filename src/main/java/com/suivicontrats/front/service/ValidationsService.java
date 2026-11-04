@@ -6,6 +6,10 @@ import com.suivicontrats.front.entity.Utilisateurs;
 import com.suivicontrats.front.repository.ValidationsRepository;
 import com.suivicontrats.front.repository.ContratRepository;
 import com.suivicontrats.front.repository.UtilisateursRepository;
+import com.suivicontrats.front.repository.AvenantsRepository;
+import com.suivicontrats.front.repository.VersionsContratRepository;
+import com.suivicontrats.front.entity.Avenants;
+import com.suivicontrats.front.entity.VersionsContrat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +29,8 @@ public class ValidationsService {
     private final NotificationsService notificationsService;
     private final JournauxAuditService journauxAuditService;
     private final ReglesValidationService reglesValidationService;
+    private final AvenantsRepository avenantsRepo;
+    private final VersionsContratRepository versionsRepo;
 
     public List<Validations> getByContrat(Integer contratId) {
         return all().stream().filter(v -> v.getContratId().equals(contratId)).toList();
@@ -126,6 +132,11 @@ public class ValidationsService {
                     "Un commentaire est obligatoire pour justifier la demande de modification.");
         }
         Validations v = getOne(validationId);
+        // Les validations d'avenant suivent leur propre cycle et ne modifient
+        // le contrat qu'après approbation de toutes les étapes requises.
+        if (v.getAvenantId() != null) {
+            return deciderAvenant(v, valideurId, decision, commentaire);
+        }
         String requiredRole = "ROLE_" + v.getRoleRequis();
         if (!List.of("ROLE_VALIDEUR", "ROLE_JURIDIQUE").contains(requiredRole)
                 || auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals(requiredRole))
@@ -227,6 +238,131 @@ public class ValidationsService {
             }
         });
         return saved;
+    }
+
+    /** Traite une décision appartenant au cycle d'un avenant. */
+    private Validations deciderAvenant(Validations v, Integer userId, String decision, String commentaire) {
+        Avenants avenant = avenantsRepo.findById(v.getAvenantId())
+                .orElseThrow(() -> new RuntimeException("Avenant associé introuvable."));
+        Contrat contrat = contratRepo.findById(v.getContratId())
+                .orElseThrow(() -> new RuntimeException("Contrat associé introuvable."));
+        String authority = "ROLE_" + v.getRoleRequis();
+        Authentication auth = currentAuth();
+        if (!auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals(authority))
+                || !"EN_ATTENTE".equals(v.getDecision())
+                || (v.getValideurId() != null && !v.getValideurId().equals(userId))) {
+            throw new AccessDeniedException("Cette validation d'avenant ne vous est pas attribuée.");
+        }
+
+        v.setValideurId(userId);
+        v.setDecision(decision);
+        v.setCommentaire(commentaire);
+        v.setDateValidation(LocalDateTime.now());
+        Validations saved = validationsRepo.save(v);
+        List<Validations> cycle = validationsRepo.findByAvenantIdAndCycleOrderByNiveauAsc(
+                avenant.getId(), v.getCycle());
+        List<Validations> niveau = cycle.stream().filter(s -> s.getNiveau().equals(v.getNiveau())).toList();
+        boolean niveauApprouve = niveau.stream().allMatch(s -> "APPROUVE".equals(s.getDecision()));
+
+        if (!"APPROUVE".equals(decision)) {
+            cycle.stream().filter(s -> !s.getId().equals(saved.getId())
+                    && ("A_VENIR".equals(s.getDecision()) || "EN_ATTENTE".equals(s.getDecision())))
+                    .forEach(s -> { s.setDecision("NON_REQUISE"); validationsRepo.save(s); });
+            avenant.setStatut("REJETE".equals(decision) ? "REJETE" : "MODIFICATION_DEMANDEE");
+            avenantsRepo.save(avenant);
+            String title = "REJETE".equals(decision) ? "Avenant rejeté" : "Modifications demandées sur l'avenant";
+            String msg = "L'avenant n°" + avenant.getNumero() + " du contrat " + contrat.getReference()
+                    + ("REJETE".equals(decision) ? " a été rejeté." : " nécessite des corrections.");
+            if (commentaire != null && !commentaire.isBlank()) msg += " Motif : " + commentaire.trim();
+            notificationsService.notifyUserByEmail(avenant.getCreePar(), contrat.getId(), title, msg, "AVENANT");
+            journauxAuditService.record(userId, contrat.getId(), contrat.getReference(),
+                    "AVENANT_" + decision, "statut=EN_VALIDATION", "avenant=" + avenant.getId()
+                            + "; statut=" + avenant.getStatut() + "; commentaire=" + commentaire);
+            return saved;
+        }
+
+        if (!niveauApprouve) {
+            notificationsService.notifyUserByEmail(avenant.getCreePar(), contrat.getId(),
+                    "Approbation partielle de l'avenant", "Une approbation a été donnée pour l'avenant n°"
+                            + avenant.getNumero() + ", mais une autre approbation du même niveau reste attendue.", "AVENANT");
+            return saved;
+        }
+
+        Integer prochainNiveau = cycle.stream()
+                .filter(s -> s.getNiveau() > v.getNiveau() && "A_VENIR".equals(s.getDecision()))
+                .map(Validations::getNiveau).min(Integer::compareTo).orElse(null);
+        if (prochainNiveau != null) {
+            List<Validations> prochaines = cycle.stream()
+                    .filter(s -> s.getNiveau().equals(prochainNiveau) && "A_VENIR".equals(s.getDecision())).toList();
+            prochaines.forEach(s -> s.setDecision("EN_ATTENTE"));
+            validationsRepo.saveAll(prochaines);
+            prochaines.forEach(step -> notifierEtapeAvenant(step, avenant, contrat));
+            notificationsService.notifyUserByEmail(avenant.getCreePar(), contrat.getId(),
+                    "Étape suivante de l'avenant", "L'avenant n°" + avenant.getNumero()
+                            + " passe à l'étape de validation suivante.", "AVENANT");
+            return saved;
+        }
+
+        // Toutes les approbations sont obtenues : appliquer les changements et créer la version.
+        String avant = "montant=" + contrat.getMontant() + "; dateFin=" + contrat.getDateFin();
+        // Si aucune version n'existe encore, archiver l'état initial avant de créer la version modifiée.
+        if (versionsRepo.findTopByContratIdOrderByVersionDesc(contrat.getId()).isEmpty()) {
+            versionsRepo.save(VersionsContrat.builder().contratId(contrat.getId()).version(1)
+                    .creePar(avenant.getCreePar()).contenu(snapshotContrat(contrat)).build());
+        }
+        if (avenant.getMontantApres() != null) contrat.setMontant(avenant.getMontantApres());
+        if (avenant.getDateFinApres() != null) {
+            if (!avenant.getDateFinApres().isAfter(contrat.getDateDebut()))
+                throw new IllegalArgumentException("La date de fin de l'avenant doit être postérieure à la date de début.");
+            contrat.setDateFin(avenant.getDateFinApres());
+            contrat.setDureeMois((int) java.time.temporal.ChronoUnit.MONTHS.between(
+                    contrat.getDateDebut(), avenant.getDateFinApres()));
+        }
+        contratRepo.save(contrat);
+        avenant.setStatut("APPROUVE");
+        avenantsRepo.save(avenant);
+
+        int nextVersion = versionsRepo.findTopByContratIdOrderByVersionDesc(contrat.getId())
+                .map(old -> old.getVersion() + 1).orElse(1);
+        versionsRepo.save(VersionsContrat.builder().contratId(contrat.getId()).version(nextVersion)
+                .avenantId(avenant.getId()).creePar(userId).contenu(snapshotContrat(contrat)).build());
+
+        String apres = "montant=" + contrat.getMontant() + "; dateFin=" + contrat.getDateFin();
+        journauxAuditService.record(userId, contrat.getId(), contrat.getReference(), "AVENANT_APPROUVE_APPLIQUE",
+                avant, apres + "; avenant=" + avenant.getId() + "; version=" + nextVersion);
+        String messageFinal = "L'avenant n°" + avenant.getNumero() + " du contrat " + contrat.getReference()
+                + " a été approuvé. La version " + nextVersion + " du contrat est disponible.";
+        notificationsService.notifyUserByEmail(avenant.getCreePar(), contrat.getId(),
+                "Avenant entièrement approuvé", messageFinal, "AVENANT");
+        if (!avenant.getCreePar().equals(contrat.getResponsableId()))
+            notificationsService.notifyUserByEmail(contrat.getResponsableId(), contrat.getId(),
+                    "Avenant approuvé", messageFinal, "AVENANT");
+        return saved;
+    }
+
+    private void notifierEtapeAvenant(Validations step, Avenants avenant, Contrat contrat) {
+        String title = "Avenant à approuver — " + contrat.getReference();
+        String message = "L'avenant n°" + avenant.getNumero() + " attend votre décision (niveau "
+                + step.getNiveau() + ").";
+        if (step.getValideurId() != null) {
+            notificationsService.notifyUserByEmail(step.getValideurId(), contrat.getId(), title, message, "AVENANT");
+        } else {
+            notificationsService.notifyRoleByEmail(Utilisateurs.Role.valueOf(step.getRoleRequis()),
+                    contrat.getId(), title, message, "AVENANT");
+        }
+    }
+
+    private java.util.Map<String, Object> snapshotContrat(Contrat c) {
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("reference", c.getReference()); data.put("objet", c.getObjet());
+        data.put("description", c.getDescription()); data.put("clauses", c.getClauses());
+        data.put("montant", c.getMontant()); data.put("devise", c.getDevise());
+        data.put("dateSignature", c.getDateSignature()); data.put("dateDebut", c.getDateDebut());
+        data.put("dateFin", c.getDateFin()); data.put("dureeMois", c.getDureeMois());
+        data.put("service", c.getService()); data.put("renouvellementAutomatique", c.getRenouvellementAutomatique());
+        data.put("joursPreavis", c.getJoursPreavis()); data.put("typeId", c.getTypeId());
+        data.put("statut", c.getStatut());
+        return data;
     }
 
     /**

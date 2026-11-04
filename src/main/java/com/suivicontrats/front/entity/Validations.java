@@ -8,8 +8,7 @@ import java.time.LocalDateTime;
 @Table(name = "validations", indexes = {
                 @Index(name = "idx_validations_contract", columnList = "validations_contrat_id"),
                 @Index(name = "idx_validations_decision", columnList = "validations_decision")
-}, uniqueConstraints = @UniqueConstraint(name = "uq_validation_cycle_niveau", columnNames = { "validations_contrat_id",
-                "validations_cycle", "validations_niveau", "validations_role_requis" }))
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -23,6 +22,10 @@ public class Validations {
 
         @Column(name = "validations_contrat_id", nullable = false)
         private Integer contratId;
+
+        // NULL pour une validation de contrat ; renseigné pour une validation d'avenant.
+        @Column(name = "validations_avenant_id")
+        private Long avenantId;
 
         @Column(name = "validations_valideur_id")
         private Integer valideurId;

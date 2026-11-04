@@ -53,6 +53,16 @@ public class Avenants {
     @Column(name = "avenants_cree_par")
     private Integer creePar;
 
+    // Statut indépendant du contrat : un avenant en attente ne modifie jamais le contrat actif.
+    @Column(name = "avenants_statut", nullable = false, length = 30)
+    @Builder.Default
+    private String statut = "EN_ATTENTE";
+
+    // Chaque nouvelle soumission après demande de modification ouvre un nouveau cycle.
+    @Column(name = "avenants_cycle_validation", nullable = false)
+    @Builder.Default
+    private Integer cycleValidation = 1;
+
     @Column(name = "avenants_date_creation", nullable = false)
     @Builder.Default
     private LocalDateTime dateCreation = LocalDateTime.now();

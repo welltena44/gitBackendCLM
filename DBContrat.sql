@@ -157,6 +157,8 @@ CREATE TABLE regles_validation (
 CREATE TABLE validations (
     validations_id               BIGSERIAL PRIMARY KEY,
     validations_contrat_id       INTEGER     NOT NULL REFERENCES contrats(contrats_id) ON DELETE CASCADE,
+    -- NULL pour une validation du contrat initial ; renseigné pour une validation d'avenant.
+    validations_avenant_id       BIGINT,
     validations_valideur_id      INTEGER     REFERENCES utilisateurs(utilisateurs_id),
     validations_demandeur_id     INTEGER     REFERENCES utilisateurs(utilisateurs_id),
     validations_niveau           INTEGER     NOT NULL CHECK (validations_niveau > 0),
@@ -174,7 +176,10 @@ CREATE TABLE validations (
 
 CREATE INDEX idx_validations_contract ON validations(validations_contrat_id);
 CREATE INDEX idx_validations_decision ON validations(validations_decision);
-CREATE UNIQUE INDEX uq_validation_cycle_niveau ON validations(validations_contrat_id, validations_cycle, validations_niveau, validations_role_requis);
+-- L'unicité distingue les cycles du contrat initial de ceux de chaque avenant.
+-- La contrainte FK est ajoutée après la création de la table avenants.
+CREATE INDEX idx_validations_avenant_cycle
+    ON validations(validations_avenant_id, validations_cycle);
 
 -- Équivalent des contraintes de la migration multi-niveaux : les étapes
 -- futures et celles annulées par un rejet/demande de correction sont conservées.
@@ -196,8 +201,33 @@ CREATE TABLE avenants (
     avenants_document_id     BIGINT        REFERENCES documents_contrat(documents_contrat_id) ON DELETE SET NULL,
     avenants_cree_par        INTEGER       REFERENCES utilisateurs(utilisateurs_id),
     avenants_date_creation   TIMESTAMP     NOT NULL DEFAULT NOW(),
+    -- Un avenant reste en attente tant que son circuit d'approbation n'est pas terminé.
+    avenants_statut           VARCHAR(30)   NOT NULL DEFAULT 'EN_ATTENTE'
+                              CHECK (avenants_statut IN ('EN_ATTENTE', 'EN_VALIDATION', 'APPROUVE', 'REJETE', 'MODIFICATION_DEMANDEE')),
+    avenants_cycle_validation INTEGER      NOT NULL DEFAULT 1
+                              CHECK (avenants_cycle_validation > 0),
     CONSTRAINT uq_avenant_numero UNIQUE (avenants_contrat_id, avenants_numero)
 );
+
+-- Liaison des validations aux avenants, sans mélanger leurs cycles avec ceux du contrat.
+ALTER TABLE validations
+    ADD CONSTRAINT fk_validations_avenant
+    FOREIGN KEY (validations_avenant_id)
+    REFERENCES avenants(avenants_id) ON DELETE CASCADE;
+
+-- Un même niveau/rôle peut exister dans le cycle du contrat initial et dans
+-- le cycle d'un avenant : l'identifiant de l'avenant fait partie de l'unicité.
+CREATE UNIQUE INDEX uq_validation_cycle_niveau_avenant
+    ON validations (
+        validations_contrat_id,
+        COALESCE(validations_avenant_id, 0),
+        validations_cycle,
+        validations_niveau,
+        validations_role_requis
+    );
+
+CREATE INDEX idx_avenants_statut
+    ON avenants(avenants_statut, avenants_contrat_id);
 
 -- ---------------------------------------------------------------------
 -- VERSIONS

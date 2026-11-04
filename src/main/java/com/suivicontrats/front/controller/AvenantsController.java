@@ -33,6 +33,12 @@ public class AvenantsController {
         return service.save(a);
     }
 
+    /** Soumet un nouvel avenant après que le gestionnaire a corrigé les éléments demandés. */
+    @PostMapping("/{id}/resoumettre")
+    public Avenants resoumettre(@PathVariable Long id) {
+        return service.resoumettre(id);
+    }
+
     @PutMapping("/{id}")
     public Avenants update(@PathVariable Long id, @RequestBody Avenants a) {
         return service.update(id, a);
