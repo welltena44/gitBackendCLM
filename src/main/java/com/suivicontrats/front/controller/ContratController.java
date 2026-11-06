@@ -4,6 +4,11 @@ import com.suivicontrats.front.entity.Contrat;
 import com.suivicontrats.front.service.ContratService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import com.suivicontrats.front.service.ContratPdfExtractionService;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -11,6 +16,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ContratController {
     private final ContratService service;
+    private final ContratPdfExtractionService extractionService;
 
     @GetMapping
     public List<Contrat> all() {
@@ -22,9 +28,22 @@ public class ContratController {
         return service.getPendingLegalApproval();
     }
 
+    /** Contrats sans aucune règle de validation active : ils ne peuvent pas être soumis au circuit. */
+    @GetMapping("/sans-regles")
+    public List<Contrat> sansRegles() {
+        return service.findSansRegles();
+    }
+
     @GetMapping("/{id}")
     public Contrat one(@PathVariable Integer id) {
         return service.getById(id);
+    }
+
+    @PostMapping(value = "/extraire-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN','GESTIONNAIRE')")
+    public ContratPdfExtractionService.Reponse extrairePdf(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        return extractionService.extraire(file);
     }
 
     @PostMapping

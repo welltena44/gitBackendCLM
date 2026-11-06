@@ -57,6 +57,15 @@ public class ContratService {
         throw new AccessDeniedException("Accès interdit");
     }
 
+    /** Retourne les contrats qui ne sont couverts par aucune règle de validation active.
+     *  Utile pour le tableau de bord administrateur : ces contrats ne peuvent pas être
+     *  soumis au circuit de validation tant qu'aucun seuil ne leur est appliqué. */
+    public List<Contrat> findSansRegles() {
+        return contratRepo.findAll().stream()
+                .filter(c -> reglesValidationService.getCircuit(c.getTypeId(), c.getMontant()).isEmpty())
+                .toList();
+    }
+
     public List<Contrat> getPendingLegalApproval() {
         Authentication auth = currentAuth();
         if (!hasRole(auth, "ADMIN") && !hasRole(auth, "JURIDIQUE")) {
