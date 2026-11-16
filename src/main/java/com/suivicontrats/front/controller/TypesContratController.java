@@ -10,7 +10,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/types-contrat")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000") // Ajustez le port si votre React tourne sur un autre port (ex: 5173)
 public class TypesContratController {
 
     private final TypesContratService service;

@@ -96,13 +96,13 @@ public class NotificationsService {
 
     @Transactional
     public void notifyMissingRuleForContract(Integer contractId, String title, String message) {
-        for (Utilisateurs.Role role : List.of(Utilisateurs.Role.ADMIN, Utilisateurs.Role.JURIDIQUE)) {
-            utilisateursRepo.findByRoleAndActifTrue(role).stream()
-                    .map(Utilisateurs::getId)
-                    .filter(java.util.Objects::nonNull)
-                    .distinct()
-                    .forEach(userId -> saveForUser(userId, contractId, title, message, "INFO"));
-        }
+        java.util.stream.Stream.concat(
+                utilisateursRepo.findByRoleAndActifTrue(Utilisateurs.Role.ADMIN).stream(),
+                utilisateursRepo.findByRoleAndActifTrue(Utilisateurs.Role.JURIDIQUE).stream())
+                .map(Utilisateurs::getId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .forEach(userId -> saveForUser(userId, contractId, title, message, "INFO"));
     }
 
     private String truncate(String value, int maxLength) {

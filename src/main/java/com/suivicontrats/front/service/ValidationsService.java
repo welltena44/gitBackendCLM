@@ -250,8 +250,11 @@ public class ValidationsService {
                 notificationsService.notifyUser(responsableId, contract.getId(), "Modifications demandées", message,
                         "VALIDATION");
             } else if (approvalsComplete) {
+                String approvalMessage = "Le contrat " + contract.getReference() + " a été approuvé.";
                 notificationsService.notifyUser(responsableId, contract.getId(), "Contrat approuvé",
-                        "Le contrat " + contract.getReference() + " a été approuvé.", "VALIDATION");
+                        approvalMessage, "VALIDATION");
+                notificationsService.notifyContractRole(Utilisateurs.Role.ADMIN, contract.getId(),
+                        "Contrat approuvé", approvalMessage, "VALIDATION");
             } else if ("REJETE".equals(decision)) {
                 String message = "Le contrat " + contract.getReference() + " a été rejeté.";
                 if (commentaire != null && !commentaire.isBlank())
