@@ -22,7 +22,7 @@ public class PartiesContrat {
     @Column(name = "parties_contrat_nom", nullable = false, length = 150)
     private String nom;
 
-    @Column(name = "parties_contrat_type", length = 50)
+    @Column(name = "parties_contrat_type", length = 100)
     private String type;
 
     @Column(name = "parties_contrat_email", length = 150)

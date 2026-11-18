@@ -110,7 +110,7 @@ CREATE TABLE parties_contrat (
     parties_contrat_id          BIGSERIAL PRIMARY KEY,
     parties_contrat_contrat_id  INTEGER       NOT NULL REFERENCES contrats(contrats_id) ON DELETE CASCADE,
     parties_contrat_nom         VARCHAR(150)  NOT NULL,
-    parties_contrat_type        VARCHAR(50)   CHECK (parties_contrat_type IN ('COCONTRACTANT', 'FOURNISSEUR', 'CLIENT', 'PARTENAIRE', 'PRESTATAIRE', 'SOUS-TRAITANT', 'AUTRE')),
+    parties_contrat_type        VARCHAR(100),
     parties_contrat_email       VARCHAR(150),
     parties_contrat_telephone   VARCHAR(30)
 );
